@@ -120,7 +120,11 @@ def to_cets(
     dataset_ids = set()
     for spec in specs:
         want_ann = spec.annotations if annotations else "none"
-        for run in find_runs(client, spec):
+        try:
+            runs = find_runs(client, spec)
+        except ValueError as e:
+            raise click.ClickException(str(e)) from e
+        for run in runs:
             sr = SeriesReport(run.name)
             report.series.append(sr)
             try:
