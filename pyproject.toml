@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cets-cryoet-data-portal"
+version = "0.1.0"
+description = "Converters between the cryoET Data Portal (API and ingestion configs) and the CETS cryo-ET standard (rigid profile cets-rigid/0.1)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+authors = [{name = "Utz H. Ermel", email = "utz.ermel@czii.org"}]
+keywords = ["cryoet", "cryo-et", "tomography", "alignment", "CETS", "cryoET Data Portal"]
+dependencies = [
+    "cryoet-alignment>=0.3.0.dev0",
+    "cets_data_model @ git+https://github.com/TomoBabel/cets-data-models.git@b415e952d309ac1ec0dee01a3a5db639cb08bba5",
+    "click",
+    "mrcfile",
+    "cryoet-data-portal>=4.3.1",
+    "requests",
+    "numpy>=1.20.0",
+    "pydantic>=2",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy==1.8.0",  # this version should match the one in .pre-commit-config.yaml
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "types-setuptools",
+    "types-PyYAML",
+    "ruff==0.11.12", # this version should match the one in .pre-commit-config.yaml
+]
+goldens = ["arewarpion"]
+live = ["cryoet-data-portal>=4.3.1"]
+
+[project.scripts]
+cets-cdp = "cets_cdp.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "B", "I", "C4", "SIM", "COM"]
+ignore = ["E501", "COM812"]
+
+[tool.mypy]
+files = ["src", "tests"]
+python_version = "3.11"
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
