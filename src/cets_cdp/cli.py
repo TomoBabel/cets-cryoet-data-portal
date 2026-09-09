@@ -62,7 +62,13 @@ def main():
     "-o", "--output", "output", required=True, type=click.Path(dir_okay=False), help="CETS dataset JSON to write."
 )
 @click.option("--name", default=None, help="Dataset name (default: the dataset id).")
-@click.option("--uri-scheme", "uri_scheme", type=click.Choice(["https", "s3"]), default=None)
+@click.option(
+    "--uri-scheme",
+    "uri_scheme",
+    type=click.Choice(["https", "s3"]),
+    default=None,
+    help="Scheme of the paths written into the document [https, warned].",
+)
 @click.option(
     "--cache",
     "cache",
@@ -71,8 +77,8 @@ def main():
     help="Cache for fetched metadata [OUT_DIR/.portal].",
 )
 @click.option("--voltage", type=float, default=None, help="kV (companion only; default: the portal value).")
-@click.option("--cs", type=float, default=None)
-@click.option("--amp-contrast", "amp_contrast", type=float, default=None)
+@click.option("--cs", type=float, default=None, help="mm (companion only; default: the portal value).")
+@click.option("--amp-contrast", "amp_contrast", type=float, default=None, help="Amplitude contrast (companion only).")
 @common_options
 def to_cets(sources, output, name, uri_scheme, cache, config_path, overwrite, fail_fast, **cli):
     """Convert portal runs (portal:<dataset>[/<run>][@alignment=ID,voxel=A]) to a CETS dataset JSON."""
@@ -127,15 +133,21 @@ def to_cets(sources, output, name, uri_scheme, cache, config_path, overwrite, fa
 @main.command("from-cets")
 @click.argument("document", type=click.Path(exists=True, dir_okay=False))
 @click.option("-o", "--output", "output", required=True, type=click.Path(file_okay=False), help="Staging directory.")
-@click.option("--deposition-id", "deposition_id", type=int, required=True)
+@click.option("--deposition-id", "deposition_id", type=int, required=True, help="Portal deposition id.")
 @selection_options
 @click.option(
     "--method-type",
     "method_type",
     type=click.Choice(["fiducial_based", "patch_tracking", "projection_matching", "simulated", "undefined"]),
     default=None,
+    help="method_type of the alignment block (default: companion, else TODO).",
 )
-@click.option("--portal-standard/--no-portal-standard", "portal_standard", default=None)
+@click.option(
+    "--portal-standard/--no-portal-standard",
+    "portal_standard",
+    default=None,
+    help="is_portal_standard of the alignment block (default: companion, else TODO).",
+)
 @click.option(
     "--template",
     type=click.Path(exists=True, dir_okay=False),
@@ -149,10 +161,16 @@ def to_cets(sources, output, name, uri_scheme, cache, config_path, overwrite, fa
     help="Config glob for tilt series that are not staged (e.g. already in the bucket).",
 )
 @click.option("--tomograms-glob", "tomograms_glob", default=None, help="Config glob for tomograms that are not staged.")
-@click.option("--voltage", type=float, default=None)
-@click.option("--cs", type=float, default=None)
-@click.option("--defocus-hand", "defocus_hand", type=click.Choice(["-1", "1"]), default=None)
-@click.option("--no-ctf", "no_ctf", is_flag=True, default=None)
+@click.option("--voltage", type=float, default=None, help="kV for the tiltseries block (default: companion).")
+@click.option("--cs", type=float, default=None, help="mm for the tiltseries block (default: companion).")
+@click.option(
+    "--defocus-hand",
+    "defocus_hand",
+    type=click.Choice(["-1", "1"]),
+    default=None,
+    help="Defocus handedness column of the staged _CTF.txt (default: companion; omitted when unknown).",
+)
+@click.option("--no-ctf", "no_ctf", is_flag=True, default=None, help="Do not stage CTFs.")
 @click.option(
     "--validate/--no-validate",
     "validate",
