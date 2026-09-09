@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Converters between the cryoET Data Portal (API and ingestion configs) and the CETS cryo-ET standard (rigid profile cets-rigid/0.1)."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "Apache-2.0"}
+license = {text = "MPL-2.0"}
 authors = [{name = "Utz H. Ermel", email = "utz.ermel@czii.org"}]
 keywords = ["cryoet", "cryo-et", "tomography", "alignment", "CETS", "cryoET Data Portal"]
 dependencies = [
