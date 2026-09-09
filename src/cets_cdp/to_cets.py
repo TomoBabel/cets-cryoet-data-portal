@@ -81,41 +81,41 @@ def portal_to_cets(data: PortalRunData, res: Resolver, sr: SeriesReport, *, alig
             series_id=f"{stem}_movies", stacks=[{"id": movie_ids[z], "path": _uri(frame_urls[z], scheme)} for z in range(n_raw)],
         ))
 
-    # tomograms: every portal tomogram at its IMPLIED voxel; the reference frame is the bin-1 box
+    # tomograms: every portal tomogram at the voxel spacing the portal declares (the portal's own coordinate
+    # convention; the value implied by the raw field of view is recorded in the companion for information only)
     ref_portal = pick_tomogram(data, voxel)
     tomograms: List[Any] = []
     tomo_comps: Dict[str, TomogramCompanion] = {}
+    ref_tomo = None
     for t in data.tomograms:
-        iv = implied_voxel(data, t)
         tomo = tomogram_entity(
             tomogram_id=f"{stem}_tomo_{t.id}", path=_uri(t.https_mrc_file or t.https_omezarr_dir, scheme), size_px=t.size,
-            voxel_size_a=iv, tilt_series_id=stem, ctf_corrected=bool(t.ctf_corrected),
+            voxel_size_a=t.voxel_spacing, tilt_series_id=stem, ctf_corrected=bool(t.ctf_corrected),
         )
         tomograms.append(tomo)
         tomo_comps[tomo.id] = TomogramCompanion(
-            voxel_header_a=t.voxel_spacing, voxel_implied_a=iv, processing=t.processing,
+            voxel_header_a=t.voxel_spacing, voxel_implied_a=implied_voxel(data, t), processing=t.processing,
             reconstruction_method=t.reconstruction_method, reconstruction_software=t.reconstruction_software,
             source_ref=f"portal tomogram {t.id}",
         )
-    # native box: raw extent in X/Y; Z from the reference tomogram's depth at its implied voxel
-    if ref_portal is not None:
-        z_px = int(round(ref_portal.size[2] * implied_voxel(data, ref_portal) / pix / 2.0) * 2)
-        z_src = f"tomogram {ref_portal.id}: size_z x implied voxel"
-    else:
-        z_px = None
-        z_src = ""
+        if ref_portal is not None and t.id == ref_portal.id:
+            ref_tomo = tomo
     aln = pick_alignment(data, alignment_id)
-    if z_px is None and aln is not None and aln.volume_dimension_a.get("z"):
-        z_px = int(round(float(aln.volume_dimension_a["z"]) / pix / 2.0) * 2)
-        z_src = f"alignment {aln.id} volume_z_dimension / pixel_spacing"
-    z_px = res.require("tomo_size", discovered=z_px, note=z_src, convert=lambda v: int(round(float(v))))
-    ref_tomo = tomogram_entity(tomogram_id=f"{stem}_volume", path=None, size_px=(width, height, z_px), voxel_size_a=pix, tilt_series_id=stem)
-    tomograms.insert(0, ref_tomo)
-    tomo_comps[ref_tomo.id] = TomogramCompanion(voxel_implied_a=pix, source_ref="raw tilt-series extent x pixel_spacing, Z from the reference tomogram; no file")
+    if ref_tomo is not None:
+        res.resolve("reference_tomogram", discovered=ref_tomo.id, note=f"portal tomogram {ref_portal.id} at {ref_portal.voxel_spacing} Å" + (" (--voxel)" if voxel else " (portal standard / finest)"))
+    elif aln is not None and all(aln.volume_dimension_a.get(k) for k in "xyz"):
+        # no reconstruction on the portal: the alignment's own box (portal volume_dimension) at the tilt pixel
+        box = aln.volume_dimension_a
+        size = tuple(int(round(float(box[k]) / pix)) for k in "xyz")
+        ref_tomo = tomogram_entity(tomogram_id=f"{stem}_volume", path=None, size_px=size, voxel_size_a=pix, tilt_series_id=stem)
+        tomograms.insert(0, ref_tomo)
+        tomo_comps[ref_tomo.id] = TomogramCompanion(voxel_implied_a=pix, source_ref=f"portal alignment {aln.id} volume_dimension at pixel_spacing; no file")
+        res.resolve("reference_tomogram", discovered=ref_tomo.id, note="no tomogram on the portal: alignment volume_dimension")
+        sr.warnings.append("no tomogram on the portal for this run: the alignment's volume_dimension box is the reference frame")
 
     alignments = []
     aln_comp = None
-    if aln is not None:
+    if aln is not None and ref_tomo is not None:
         hub = aln.hub
         if not _is_identity(aln.affine_transformation_matrix) or any(abs(float(v or 0.0)) > 0 for v in aln.volume_offset_a.values()):
             raise ValueError(
@@ -124,12 +124,13 @@ def portal_to_cets(data: PortalRunData, res: Resolver, sr: SeriesReport, *, alig
             )
         if aln.tilt_offset:
             sr.warnings.append(f"alignment tilt_offset {aln.tilt_offset} deg is already inside the per-section tilt angles (AreTomo3 semantics); recorded only")
-        native = {"x": width * pix, "y": height * pix, "z": z_px * pix}
+        ref_frame = image_frame(ref_tomo)
+        native = {k: float(n * s) for k, n, s in zip("xyz", ref_frame.size_px, ref_frame.spacing_a, strict=True)}
         portal_box = {k: float(v) for k, v in aln.volume_dimension_a.items() if v is not None}
         if portal_box:
             dev = max(abs(portal_box.get(k, native[k]) - native[k]) for k in "xyz")
-            sr.gates.append(Gate("portal_volume_box_vs_raw_extent", True, value=portal_box, expected=native,
-                                 note=f"portal box uses the rounded header voxel; deviation {dev:.1f} Å is expected"))
+            sr.gates.append(Gate("portal_volume_box_vs_reference_tomogram", dev <= ref_frame.isotropic_spacing, value=portal_box, expected=native,
+                                 note=f"deviation {dev:.2f} Å; the portal computes its box from the ingested tomogram's rounded voxel"))
         hub.volume_dimension = native
         cets_alignment = alignment_to_cets(
             hub, tilt_series_id=stem, alignment_name=f"portal{aln.id}", image=image_frame(ts.images[0]),
@@ -149,8 +150,10 @@ def portal_to_cets(data: PortalRunData, res: Resolver, sr: SeriesReport, *, alig
             native_volume_dimension_a=native, frame_convention={"image_center": "half", "volume_center": "half"},
             dropped=dropped, source_ref=f"portal:{data.dataset_id}/{stem} alignment {aln.id}; portal volume_dimension {portal_box}",
         )
-    else:
+    elif aln is None:
         sr.warnings.append("no alignment on the portal for this run")
+    else:
+        sr.warnings.append("no tomogram and no alignment box on the portal: alignment not encoded")
 
     images = {}
     for z in range(n_raw):

@@ -35,7 +35,7 @@ from cets_cdp.from_cets import (
 from cets_cdp.to_cets import portal_to_cets
 
 PACKAGE = "cets-cdp"
-TO_CETS_OPTIONS = {"uri_scheme", "tomo_size", "voltage", "cs", "amp_contrast"}
+TO_CETS_OPTIONS = {"uri_scheme", "voltage", "cs", "amp_contrast"}
 FROM_CETS_OPTIONS = {"method_type", "portal_standard", "template", "voltage", "cs", "defocus_hand", "no_ctf", "validate", "tiltseries_glob", "tomograms_glob"}
 
 
@@ -51,7 +51,6 @@ def main():
 @click.option("--name", default=None, help="Dataset name (default: the dataset id).")
 @click.option("--uri-scheme", "uri_scheme", type=click.Choice(["https", "s3"]), default=None)
 @click.option("--cache", "cache", type=click.Path(file_okay=False), default=None, help="Cache for fetched metadata [OUT_DIR/.portal].")
-@click.option("--tomo-size", "tomo_size", type=int, default=None, help="Reconstruction depth Z in raw pixels (default: reference tomogram).")
 @click.option("--voltage", type=float, default=None, help="kV (companion only; default: the portal value).")
 @click.option("--cs", type=float, default=None)
 @click.option("--amp-contrast", "amp_contrast", type=float, default=None)

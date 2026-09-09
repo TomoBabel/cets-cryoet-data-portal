@@ -64,19 +64,26 @@ def test_recorded_run_to_cets(data, tmp_path):
     assert len(ts.images) == 31 and ts.images[0].width == 4096
     assert ts.images[0].nominal_tilt_angle == pytest.approx(data.sections[0].raw_angle) and ts.images[0].ctf_metadata.defocus_u == pytest.approx(data.sections[0].major_defocus_a)
     assert ts.images[0].ctf_metadata.phase_shift == pytest.approx(np.degrees(data.sections[0].phase_shift_rad or 0.0))
-    # implied voxels (header 4.99 -> 5.00622, header 10.012 -> 10.0124) and the raw-extent reference box
+    # tomograms carry the portal's declared voxel spacing; the reference is the portal-standard one (finest)
     ids = [t.id for t in region.tomograms]
-    assert ids[0] == f"{RUN}_volume" and (region.tomograms[0].width, region.tomograms[0].depth) == (4096, 1196)
-    for t, tc in zip(region.tomograms[1:], [comp.tomograms[i] for i in ids[1:]], strict=True):
-        assert t.coordinate_transformations[0].sequence[1].scale[0] == pytest.approx(4096 * 1.54 / t.width)
+    assert len(ids) == 4 and not any(i.endswith("_volume") for i in ids)
+    for t, tc in zip(region.tomograms, [comp.tomograms[i] for i in ids], strict=True):
+        assert t.coordinate_transformations[0].sequence[1].scale[0] == tc.voxel_header_a
         assert tc.voxel_header_a in (4.99, 10.012) and tc.processing
+        assert tc.voxel_implied_a == pytest.approx(4096 * 1.54 / t.width)  # information only
+    ref = comp.alignments[0].reference_tomogram_id
+    ref_tomo = next(t for t in region.tomograms if t.id == ref)
+    assert ref_tomo.coordinate_transformations[0].sequence[1].scale[0] == 4.99 and ref_tomo.width == 1260
     assert comp.alignments[0].alignment_type == "LOCAL" and "rigid per-section" in comp.alignments[0].dropped[0]
-    assert comp.alignments[0].method_type == "projection_matching" and comp.alignments[0].native_volume_dimension_a["x"] == pytest.approx(6307.84)
+    # the alignment box equals the portal's own volume_dimension (size x declared voxel)
+    assert comp.alignments[0].method_type == "projection_matching"
+    assert comp.alignments[0].native_volume_dimension_a == pytest.approx({"x": 1260 * 4.99, "y": 1260 * 4.99, "z": 368 * 4.99})
+    assert data.alignments[0].volume_dimension_a["x"] == pytest.approx(1260 * 4.99)
     assert comp.tilt_series[RUN].voltage_kv == 300.0 and comp.tilt_series[RUN].tilt_axis_nominal_deg == -96.0
     assert comp.tilt_series[RUN].images[f"{RUN}_0"].acquisition_index_1b is not None
     pa = region.alignments[0].projection_alignments[0]
     assert pa.id == f"{RUN}_portal18924_align_0" and pa.sequence[2].translation == pytest.approx([-16.81 * 1.54, -79.316 * 1.54])
-    assert any(g.name == "portal_volume_box_vs_raw_extent" for g in sr.gates)
+    assert any(g.name == "portal_volume_box_vs_reference_tomogram" and g.passed for g in sr.gates)
 
 
 def test_g5_roundtrip_to_aln_equals_portal_aln(data, tmp_path):
@@ -162,7 +169,7 @@ def test_schema_check_with_backend(tmp_path):
 def test_live_portal(tmp_path):
     out = tmp_path / "live" / "10445.cets.json"
     r = _run(["to-cets", "portal:10445/TS_105_5@alignment=18924,voxel=4.99", "-o", str(out)])
-    assert "tomo_size = 1196  [discovered]" in r.stdout
+    assert "reference_tomogram = 'TS_105_5_tomo_18956'" in r.stdout
     ds = load_dataset(out)
     recorded = run_data_from_json(json.loads((DATA / "10445_TS_105_5.json").read_text()))
     live_shift = ds.regions[0].alignments[0].projection_alignments[0].sequence[2].translation

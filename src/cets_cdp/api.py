@@ -232,7 +232,8 @@ def pick_tomogram(data: PortalRunData, voxel_spacing: Optional[float] = None) ->
         if not cands:
             raise ValueError(f"no portal tomogram at voxel spacing {voxel_spacing} (has {sorted({t.voxel_spacing for t in data.tomograms})})")
         return cands[0]
-    return sorted(data.tomograms, key=lambda t: t.voxel_spacing)[0]
+    # default: the portal-standard tomogram, finest voxel first, lowest id last
+    return sorted(data.tomograms, key=lambda t: (not bool(t.is_portal_standard), t.voxel_spacing, t.id))[0]
 
 
 def pick_alignment(data: PortalRunData, alignment_id: Optional[int] = None) -> Optional[PortalAlignment]:

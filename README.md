@@ -13,10 +13,12 @@ cets-cdp from-cets out/run.cets.json -o staging/ --deposition-id 10301 --method-
 `is_aligned` — refused when true), frames (acquisition order, exposure, accumulated dose, frame URLs),
 per-section parameters (nominal angles, CTF; phase shift in radians converted to degrees), the alignment's
 `alignment_metadata.json` (the same per-section parameters the ingestion wrote; offsets are pixels) and the
-tomograms. Tomograms are described at their **implied** voxel (`pixel_spacing × size_x_ts / size_x_tomo`;
-the header value is rounded) and the reference frame is the raw-extent box with Z from the selected tomogram
-(`@voxel=`). Non-identity registration matrices / offsets are refused; LOCAL alignments contribute their
-rigid part with a note. Paths are `https://` (or `s3://` with `--uri-scheme s3`).
+tomograms. Tomograms carry the voxel spacing the portal declares, and the reference frame of the alignment
+is the portal-standard tomogram at the finest voxel (or the one selected with `@voxel=`), so the alignment
+box equals the portal's own `volume_dimension`. The companion records, for information only, the voxel the
+raw field of view would imply (`pixel_spacing × size_x_ts / size_x_tomo`). Non-identity registration
+matrices / offsets are refused; LOCAL alignments contribute their rigid part with a note. Paths are
+`https://` (or `s3://` with `--uri-scheme s3`).
 
 `from-cets` stages, per region, `alignment/<run>/<run>.aln` (or `.xf/.tlt/.xtilt` when the alignment
 carries X rotations — the backend reads that combination), `rawtlt/<run>/<run>.rawtlt`,
@@ -31,7 +33,6 @@ separately: every source glob resolves in the staging directory; the backend's g
 | option | default / derivation |
 |---|---|
 | `--uri-scheme https\|s3` | `https` (warned) |
-| `--tomo-size Z` | reference tomogram depth × implied voxel / pixel spacing |
 | `--voltage --cs --amp-contrast` | portal kV / Cs; companion only |
 | from-cets `--method-type`, `--portal-standard` | companion (portal `alignment_method`, `is_portal_standard`) else `TODO(curator)` |
 | from-cets `--template config.yaml` | curator blocks merged (datasets, tiltseries, tomograms, frames metadata) |
