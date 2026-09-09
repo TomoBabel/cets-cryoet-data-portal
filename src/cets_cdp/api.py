@@ -57,7 +57,7 @@ def parse_portal_source(token: str) -> PortalSource:
 
 
 def https_to_s3(url: Optional[str]) -> Optional[str]:
-    return S3_BUCKET + url[len(FILES_HOST):] if url and url.startswith(FILES_HOST) else url
+    return S3_BUCKET + url[len(FILES_HOST) :] if url and url.startswith(FILES_HOST) else url
 
 
 @dataclass
@@ -168,15 +168,24 @@ def fetch_run(client, run, *, cache_dir: Optional[Path] = None) -> PortalRunData
     sections = []
     for p in psp:
         f = frames.get(p.frame_id)
-        sections.append(PortalSection(
-            z_index=int(p.z_index), raw_angle=float(p.raw_angle),
-            acquisition_order_1b=(int(f.acquisition_order) + 1) if f is not None and f.acquisition_order is not None else None,
-            exposure_dose=float(f.exposure_dose) if f is not None and f.exposure_dose is not None else None,
-            accumulated_dose=float(f.accumulated_dose) if f is not None and f.accumulated_dose is not None else None,
-            frame_url=f.https_frame_path if f is not None else None,
-            major_defocus_a=p.major_defocus, minor_defocus_a=p.minor_defocus,
-            astigmatic_angle_deg=p.astigmatic_angle, phase_shift_rad=p.phase_shift,
-        ))
+        sections.append(
+            PortalSection(
+                z_index=int(p.z_index),
+                raw_angle=float(p.raw_angle),
+                acquisition_order_1b=(int(f.acquisition_order) + 1)
+                if f is not None and f.acquisition_order is not None
+                else None,
+                exposure_dose=float(f.exposure_dose) if f is not None and f.exposure_dose is not None else None,
+                accumulated_dose=float(f.accumulated_dose)
+                if f is not None and f.accumulated_dose is not None
+                else None,
+                frame_url=f.https_frame_path if f is not None else None,
+                major_defocus_a=p.major_defocus,
+                minor_defocus_a=p.minor_defocus,
+                astigmatic_angle_deg=p.astigmatic_angle,
+                phase_shift_rad=p.phase_shift,
+            )
+        )
     alignments = []
     for a in ApiAlignment.find(client, [ApiAlignment.run_id == run.id]):
         cache = (cache_dir / run.name / f"alignment_{a.id}.json") if cache_dir else None
@@ -184,38 +193,62 @@ def fetch_run(client, run, *, cache_dir: Optional[Path] = None) -> PortalRunData
         affine = None
         if a.affine_transformation_matrix:
             try:
-                affine = json.loads(a.affine_transformation_matrix) if isinstance(a.affine_transformation_matrix, str) else a.affine_transformation_matrix
+                affine = (
+                    json.loads(a.affine_transformation_matrix)
+                    if isinstance(a.affine_transformation_matrix, str)
+                    else a.affine_transformation_matrix
+                )
             except ValueError:
                 affine = None
-        alignments.append(PortalAlignment(
-            id=int(a.id), alignment_type=a.alignment_type, alignment_method=a.alignment_method,
-            is_portal_standard=getattr(a, "is_portal_standard", None), https_alignment_metadata=a.https_alignment_metadata,
-            volume_dimension_a={"x": a.volume_x_dimension, "y": a.volume_y_dimension, "z": a.volume_z_dimension},
-            volume_offset_a={"x": a.volume_x_offset, "y": a.volume_y_offset, "z": a.volume_z_offset},
-            tilt_offset=float(a.tilt_offset or 0.0), x_rotation_offset=float(a.x_rotation_offset or 0.0),
-            affine_transformation_matrix=affine or meta.get("affine_transformation_matrix"),
-            hub=Alignment(**{k: meta[k] for k in Alignment.model_fields if k in meta}), metadata=meta,
-        ))
+        alignments.append(
+            PortalAlignment(
+                id=int(a.id),
+                alignment_type=a.alignment_type,
+                alignment_method=a.alignment_method,
+                is_portal_standard=getattr(a, "is_portal_standard", None),
+                https_alignment_metadata=a.https_alignment_metadata,
+                volume_dimension_a={"x": a.volume_x_dimension, "y": a.volume_y_dimension, "z": a.volume_z_dimension},
+                volume_offset_a={"x": a.volume_x_offset, "y": a.volume_y_offset, "z": a.volume_z_offset},
+                tilt_offset=float(a.tilt_offset or 0.0),
+                x_rotation_offset=float(a.x_rotation_offset or 0.0),
+                affine_transformation_matrix=affine or meta.get("affine_transformation_matrix"),
+                hub=Alignment(**{k: meta[k] for k in Alignment.model_fields if k in meta}),
+                metadata=meta,
+            )
+        )
     mdocs = FrameAcquisitionFile.find(client, [FrameAcquisitionFile.run_id == run.id])
     tomos = [
         PortalTomogram(
-            id=int(t.id), voxel_spacing=float(t.voxel_spacing), size=(int(t.size_x), int(t.size_y), int(t.size_z)),
-            processing=t.processing, ctf_corrected=t.ctf_corrected, reconstruction_method=t.reconstruction_method,
-            reconstruction_software=t.reconstruction_software, is_portal_standard=getattr(t, "is_portal_standard", None),
-            https_mrc_file=t.https_mrc_file, https_omezarr_dir=t.https_omezarr_dir,
+            id=int(t.id),
+            voxel_spacing=float(t.voxel_spacing),
+            size=(int(t.size_x), int(t.size_y), int(t.size_z)),
+            processing=t.processing,
+            ctf_corrected=t.ctf_corrected,
+            reconstruction_method=t.reconstruction_method,
+            reconstruction_software=t.reconstruction_software,
+            is_portal_standard=getattr(t, "is_portal_standard", None),
+            https_mrc_file=t.https_mrc_file,
+            https_omezarr_dir=t.https_omezarr_dir,
         )
         for t in Tomogram.find(client, [Tomogram.run_id == run.id])
     ]
     return PortalRunData(
-        dataset_id=int(run.dataset_id), run_id=int(run.id), run_name=str(run.name), tiltseries_id=int(ts.id),
-        pixel_spacing=float(ts.pixel_spacing), size=(int(ts.size_x), int(ts.size_y), int(ts.size_z)),
+        dataset_id=int(run.dataset_id),
+        run_id=int(run.id),
+        run_name=str(run.name),
+        tiltseries_id=int(ts.id),
+        pixel_spacing=float(ts.pixel_spacing),
+        size=(int(ts.size_x), int(ts.size_y), int(ts.size_z)),
         is_aligned=bool(ts.is_aligned),
         voltage_kv=float(ts.acceleration_voltage) / 1000.0 if ts.acceleration_voltage else None,
         cs_mm=float(ts.spherical_aberration_constant) if ts.spherical_aberration_constant is not None else None,
         tilt_axis_deg=float(ts.tilt_axis) if ts.tilt_axis is not None else None,
-        https_mrc_file=ts.https_mrc_file, https_omezarr_dir=ts.https_omezarr_dir,
+        https_mrc_file=ts.https_mrc_file,
+        https_omezarr_dir=ts.https_omezarr_dir,
         mdoc_url=mdocs[0].https_mdoc_path if mdocs else None,
-        sections=sections, alignments=alignments, tomograms=tomos,
+        sections=sections,
+        alignments=alignments,
+        tomograms=tomos,
     )
 
 
@@ -230,7 +263,9 @@ def pick_tomogram(data: PortalRunData, voxel_spacing: Optional[float] = None) ->
     if voxel_spacing is not None:
         cands = [t for t in data.tomograms if abs(t.voxel_spacing - voxel_spacing) < 1e-3]
         if not cands:
-            raise ValueError(f"no portal tomogram at voxel spacing {voxel_spacing} (has {sorted({t.voxel_spacing for t in data.tomograms})})")
+            raise ValueError(
+                f"no portal tomogram at voxel spacing {voxel_spacing} (has {sorted({t.voxel_spacing for t in data.tomograms})})"
+            )
         return cands[0]
     # default: the portal-standard tomogram, finest voxel first, lowest id last
     return sorted(data.tomograms, key=lambda t: (not bool(t.is_portal_standard), t.voxel_spacing, t.id))[0]

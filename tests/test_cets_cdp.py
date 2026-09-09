@@ -43,8 +43,12 @@ def _to_cets(data: PortalRunData, out: Path, **kw):
     ds = dataset_entity("10445", [result.region])
     validate_document(ds)
     dump_json(ds, out)
-    comp = Companion(generator="test", tilt_series={RUN: result.tilt_series_companion}, alignments=[result.alignment_companion],
-                     tomograms=result.tomogram_companions)
+    comp = Companion(
+        generator="test",
+        tilt_series={RUN: result.tilt_series_companion},
+        alignments=[result.alignment_companion],
+        tomograms=result.tomogram_companions,
+    )
     comp.dump(Companion.path_for(out))
     return ds, comp, sr
 
@@ -62,7 +66,9 @@ def test_recorded_run_to_cets(data, tmp_path):
     region = ds.regions[0]
     ts = region.tilt_series[0]
     assert len(ts.images) == 31 and ts.images[0].width == 4096
-    assert ts.images[0].nominal_tilt_angle == pytest.approx(data.sections[0].raw_angle) and ts.images[0].ctf_metadata.defocus_u == pytest.approx(data.sections[0].major_defocus_a)
+    assert ts.images[0].nominal_tilt_angle == pytest.approx(data.sections[0].raw_angle) and ts.images[
+        0
+    ].ctf_metadata.defocus_u == pytest.approx(data.sections[0].major_defocus_a)
     assert ts.images[0].ctf_metadata.phase_shift == pytest.approx(np.degrees(data.sections[0].phase_shift_rad or 0.0))
     # tomograms carry the portal's declared voxel spacing; the reference is the portal-standard one (finest)
     ids = [t.id for t in region.tomograms]
@@ -77,12 +83,16 @@ def test_recorded_run_to_cets(data, tmp_path):
     assert comp.alignments[0].alignment_type == "LOCAL" and "rigid per-section" in comp.alignments[0].dropped[0]
     # the alignment box equals the portal's own volume_dimension (size x declared voxel)
     assert comp.alignments[0].method_type == "projection_matching"
-    assert comp.alignments[0].native_volume_dimension_a == pytest.approx({"x": 1260 * 4.99, "y": 1260 * 4.99, "z": 368 * 4.99})
+    assert comp.alignments[0].native_volume_dimension_a == pytest.approx(
+        {"x": 1260 * 4.99, "y": 1260 * 4.99, "z": 368 * 4.99}
+    )
     assert data.alignments[0].volume_dimension_a["x"] == pytest.approx(1260 * 4.99)
     assert comp.tilt_series[RUN].voltage_kv == 300.0 and comp.tilt_series[RUN].tilt_axis_nominal_deg == -96.0
     assert comp.tilt_series[RUN].images[f"{RUN}_0"].acquisition_index_1b is not None
     pa = region.alignments[0].projection_alignments[0]
-    assert pa.id == f"{RUN}_portal18924_align_0" and pa.sequence[2].translation == pytest.approx([-16.81 * 1.54, -79.316 * 1.54])
+    assert pa.id == f"{RUN}_portal18924_align_0" and pa.sequence[2].translation == pytest.approx(
+        [-16.81 * 1.54, -79.316 * 1.54]
+    )
     assert any(g.name == "portal_volume_box_vs_reference_tomogram" and g.passed for g in sr.gates)
 
 
@@ -96,9 +106,18 @@ def test_roundtrip_to_aln_equals_portal_aln(data, tmp_path):
     assert [str(g) for g in got.GlobalAlignments] == [str(g) for g in portal.GlobalAlignments]
     assert (tmp_path / "stage" / "ctf" / RUN / f"{RUN}_CTF.txt").exists()
     cfg = yaml.safe_load((tmp_path / "stage" / "ingestion_config.yaml").read_text())
-    assert cfg["alignments"][0]["metadata"] == {"format": "ARETOMO3", "alignment_type": "GLOBAL", "method_type": "projection_matching", "is_portal_standard": True}
+    assert cfg["alignments"][0]["metadata"] == {
+        "format": "ARETOMO3",
+        "alignment_type": "GLOBAL",
+        "method_type": "projection_matching",
+        "is_portal_standard": True,
+    }
     ts_meta = cfg["tiltseries"][0]["metadata"]
-    assert ts_meta["tilt_axis"] == pytest.approx(-96.3299) and ts_meta["tilt_range"] == {"min": -45.03, "max": 44.96} and ts_meta["tilt_step"] == 3.0
+    assert (
+        ts_meta["tilt_axis"] == pytest.approx(-96.3299)
+        and ts_meta["tilt_range"] == {"min": -45.03, "max": 44.96}
+        and ts_meta["tilt_step"] == 3.0
+    )
     assert ts_meta["pixel_spacing"] == 1.54 and ts_meta["acceleration_voltage"] == 300000
     assert ts_meta["camera"] == TODO and cfg["tomograms"] == TODO  # nothing inferred, nothing promised without data
     assert "collection_metadata" not in cfg  # the mdoc is an https URL, not local
@@ -131,9 +150,16 @@ def test_x_rotation_stages_imod(data, tmp_path):
     out.write_text(json.dumps(doc))
     r = _run(["from-cets", str(out), "-o", str(tmp_path / "stage"), "--deposition-id", "1", "--no-validate"])
     assert "staged as IMOD xf/tlt/xtilt" in r.stdout and "[ok ] backend_parser_reproduces_hub" in r.stdout
-    assert sorted(p.name for p in (tmp_path / "stage" / "alignment" / RUN).iterdir()) == [f"{RUN}.tlt", f"{RUN}.xf", f"{RUN}.xtilt"]
+    assert sorted(p.name for p in (tmp_path / "stage" / "alignment" / RUN).iterdir()) == [
+        f"{RUN}.tlt",
+        f"{RUN}.xf",
+        f"{RUN}.xtilt",
+    ]
     cfg = yaml.safe_load((tmp_path / "stage" / "ingestion_config.yaml").read_text())
-    assert cfg["alignments"][0]["metadata"]["format"] == "IMOD" and "source_multi_glob" in cfg["alignments"][0]["sources"][0]
+    assert (
+        cfg["alignments"][0]["metadata"]["format"] == "IMOD"
+        and "source_multi_glob" in cfg["alignments"][0]["sources"][0]
+    )
     xtilt = [float(v) for v in (tmp_path / "stage" / "alignment" / RUN / f"{RUN}.xtilt").read_text().split()]
     assert xtilt == pytest.approx([0.4] * 31, abs=1e-6)
 
@@ -141,26 +167,68 @@ def test_x_rotation_stages_imod(data, tmp_path):
 def test_config_heterogeneous_runs_use_run_data_map(tmp_path):
     runs = []
     for name, pix, axis in (("A", 1.54, -96.0), ("B", 1.34, -95.0)):
-        runs.append({"run_name": name, "pixel_spacing": pix, "n_raw": 31, "alignment_format": "ARETOMO3", "alignment_files": [f"{name}.aln"],
-                     "tilt_min": -45.0, "tilt_max": 45.0, "tilt_step": 3.0, "tilt_axis": axis, "ctf": True, "tiltseries_glob": "tiltseries/{run_name}/{run_name}.mrc",
-                     "tomogram": {"glob": "tomograms/{run_name}/{run_name}.mrc", "voxel_spacing": 6.16, "size": [1024, 1024, 500], "ctf_corrected": False},
-                     "tomogram_meta": {"processing": "raw", "reconstruction_method": "WBP", "reconstruction_software": "AreTomo3"},
-                     "frames_glob": None, "mdoc_glob": None, "voltage": 300.0, "cs": 2.7, "method_type": "projection_matching", "is_portal_standard": True,
-                     "exposure": [None] * 31, "dark_sections": [], "tilt_alignment_software": "AreTomo3", "tomograms_glob": None})
+        runs.append(
+            {
+                "run_name": name,
+                "pixel_spacing": pix,
+                "n_raw": 31,
+                "alignment_format": "ARETOMO3",
+                "alignment_files": [f"{name}.aln"],
+                "tilt_min": -45.0,
+                "tilt_max": 45.0,
+                "tilt_step": 3.0,
+                "tilt_axis": axis,
+                "ctf": True,
+                "tiltseries_glob": "tiltseries/{run_name}/{run_name}.mrc",
+                "tomogram": {
+                    "glob": "tomograms/{run_name}/{run_name}.mrc",
+                    "voxel_spacing": 6.16,
+                    "size": [1024, 1024, 500],
+                    "ctf_corrected": False,
+                },
+                "tomogram_meta": {
+                    "processing": "raw",
+                    "reconstruction_method": "WBP",
+                    "reconstruction_software": "AreTomo3",
+                },
+                "frames_glob": None,
+                "mdoc_glob": None,
+                "voltage": 300.0,
+                "cs": 2.7,
+                "method_type": "projection_matching",
+                "is_portal_standard": True,
+                "exposure": [None] * 31,
+                "dark_sections": [],
+                "tilt_alignment_software": "AreTomo3",
+                "tomograms_glob": None,
+            }
+        )
     cfg, rows = build_config(runs, deposition_id=7, template=None, staging=tmp_path)
-    assert rows == [{"run_name": "A", "pixel_spacing": 1.54, "tilt_axis": -96.0}, {"run_name": "B", "pixel_spacing": 1.34, "tilt_axis": -95.0}]
-    assert cfg["tiltseries"][0]["metadata"]["pixel_spacing"] == "float {pixel_spacing}" and cfg["standardization_config"]["run_data_map_file"] == "run_to_data_map.tsv"
-    assert cfg["tomograms"][0]["metadata"]["processing"] == "raw" and cfg["voxel_spacings"][0]["sources"][0]["literal"]["value"] == [6.16]
+    assert rows == [
+        {"run_name": "A", "pixel_spacing": 1.54, "tilt_axis": -96.0},
+        {"run_name": "B", "pixel_spacing": 1.34, "tilt_axis": -95.0},
+    ]
+    assert (
+        cfg["tiltseries"][0]["metadata"]["pixel_spacing"] == "float {pixel_spacing}"
+        and cfg["standardization_config"]["run_data_map_file"] == "run_to_data_map.tsv"
+    )
+    assert cfg["tomograms"][0]["metadata"]["processing"] == "raw" and cfg["voxel_spacings"][0]["sources"][0]["literal"][
+        "value"
+    ] == [6.16]
     assert "tiltseries[0].metadata.camera" in todos(cfg)
     assert check_sources_resolve(cfg, tmp_path, runs, rows)  # nothing staged here -> problems reported
 
 
 @pytest.mark.skipif(not os.environ.get("CRYOET_DATA_PORTAL_BACKEND_PATH"), reason="backend checkout not configured")
 def test_schema_check_with_backend(tmp_path):
-    cfg = {"version": "1.1.0", "standardization_config": {"deposition_id": 1, "source_prefix": "x"},
-           "datasets": [{"metadata": {"dataset_identifier": 1}, "sources": [{"literal": {"value": [1]}}]}],
-           "depositions": [{"sources": [{"literal": {"value": [1]}}]}], "runs": [{"sources": [{"literal": {"value": ["A"]}}]}],
-           "voxel_spacings": [{"sources": [{"literal": {"value": [6.16]}}]}]}
+    cfg = {
+        "version": "1.1.0",
+        "standardization_config": {"deposition_id": 1, "source_prefix": "x"},
+        "datasets": [{"metadata": {"dataset_identifier": 1}, "sources": [{"literal": {"value": [1]}}]}],
+        "depositions": [{"sources": [{"literal": {"value": [1]}}]}],
+        "runs": [{"sources": [{"literal": {"value": ["A"]}}]}],
+        "voxel_spacings": [{"sources": [{"literal": {"value": [6.16]}}]}],
+    }
     status, msgs = check_schema(cfg, os.environ["CRYOET_DATA_PORTAL_BACKEND_PATH"])
     assert status in ("passed", "failed") and isinstance(msgs, list)
 

@@ -77,10 +77,18 @@ def stage_run(
     reference = ReferenceVolume.from_tomogram(tomo)
     native = comp_aln.native_volume_dimension_a if comp_aln and comp_aln.native_volume_dimension_a else None
     hub: Alignment = alignment_from_cets(
-        cets_alignment, tilt_series=ts, reference=reference, target_frame=FRAME_CONVENTIONS["ARETOMO3"],
-        native_dimension_a=native, format_="ARETOMO3",
+        cets_alignment,
+        tilt_series=ts,
+        reference=reference,
+        target_frame=FRAME_CONVENTIONS["ARETOMO3"],
+        native_dimension_a=native,
+        format_="ARETOMO3",
     )
-    res.resolve("reference_tomogram", discovered=tomo.id, note="companion" if comp_aln and comp_aln.reference_tomogram_id else "region")
+    res.resolve(
+        "reference_tomogram",
+        discovered=tomo.id,
+        note="companion" if comp_aln and comp_aln.reference_tomogram_id else "region",
+    )
     images = sorted(ts.images or [], key=lambda im: im.section)
     n_raw = len(images)
     if [im.section for im in images] != list(range(n_raw)):
@@ -103,13 +111,30 @@ def stage_run(
             obj.to_file(str(p))
         out["alignment_format"] = "IMOD"
         out["alignment_files"] = [f"{run}.xf", f"{run}.tlt", f"{run}.xtilt"]
-        sr.gates.append(Gate("x_rotation", True, value=max(abs(p.volume_x_rotation) for p in hub.per_section_alignment_parameters),
-                             note="staged as IMOD xf/tlt/xtilt"))
+        sr.gates.append(
+            Gate(
+                "x_rotation",
+                True,
+                value=max(abs(p.volume_x_rotation) for p in hub.per_section_alignment_parameters),
+                note="staged as IMOD xf/tlt/xtilt",
+            )
+        )
         # check: the backend's own reader reproduces the hub
-        back = Alignment.from_imod(ImodAlignment(xf=ImodXF.from_file(aln_dir / f"{run}.xf"), tlt=ImodTLT.from_file(aln_dir / f"{run}.tlt"),
-                                                 xtilt=ImodXTILT.from_file(aln_dir / f"{run}.xtilt"), tiltcom=None, newstcom=None))
+        back = Alignment.from_imod(
+            ImodAlignment(
+                xf=ImodXF.from_file(aln_dir / f"{run}.xf"),
+                tlt=ImodTLT.from_file(aln_dir / f"{run}.tlt"),
+                xtilt=ImodXTILT.from_file(aln_dir / f"{run}.xtilt"),
+                tiltcom=None,
+                newstcom=None,
+            )
+        )
     else:
-        aln = hub.to_aretomo(ts_size=(width, height, n_raw), dark_angles=dark_angles, thickness_px=comp_aln.thickness_px if comp_aln else None)
+        aln = hub.to_aretomo(
+            ts_size=(width, height, n_raw),
+            dark_angles=dark_angles,
+            thickness_px=comp_aln.thickness_px if comp_aln else None,
+        )
         aln.header = "# AreTomo Alignment / Priims bprmMn"
         p = aln_dir / f"{run}.aln"
         _refuse_existing(p, overwrite)
@@ -119,7 +144,9 @@ def stage_run(
         sr.gates.append(Gate("x_rotation", True, value=0.0, note="staged as .aln"))
         back = Alignment.from_aretomo3(AreTomo3ALN.from_file(str(p)))
     worst = _hub_deviation(hub, back)
-    sr.gates.append(Gate("backend_parser_reproduces_hub", worst < 1e-3, value=worst, expected="< 1e-3 (px / deg; file precision)"))
+    sr.gates.append(
+        Gate("backend_parser_reproduces_hub", worst < 1e-3, value=worst, expected="< 1e-3 (px / deg; file precision)")
+    )
 
     # rawtlt: nominal angles per raw section
     raw_dir = staging / "rawtlt" / run
@@ -139,7 +166,10 @@ def stage_run(
     ctfs = [im.ctf_metadata for im in images]
     if all(c is not None and c.defocus_u is not None for c in ctfs) and not res.optional("no_ctf", absent=False):
         df_hand = res.optional("defocus_hand", companion=(comp_ts.defocus_hand if comp_ts else None))
-        rows = [cets_ctf.to_aretomo3_row(c, i + 1, df_hand=None if df_hand is None else int(df_hand)) for i, c in enumerate(ctfs)]
+        rows = [
+            cets_ctf.to_aretomo3_row(c, i + 1, df_hand=None if df_hand is None else int(df_hand))
+            for i, c in enumerate(ctfs)
+        ]
         ctf_dir = staging / "ctf" / run
         ctf_dir.mkdir(parents=True, exist_ok=True)
         p = ctf_dir / f"{run}_CTF.txt"
@@ -168,19 +198,35 @@ def stage_run(
         d = staging / "tomograms" / run
         d.mkdir(parents=True, exist_ok=True)
         _link(tomo_src, d / f"{run}{tomo_src.suffix}", overwrite)
-        out["tomogram"] = {"glob": f"tomograms/{{run_name}}/{{run_name}}{tomo_src.suffix}", "voxel_spacing": reference.spacing_a,
-                           "size": list(reference.size_px), "ctf_corrected": bool(tomo.ctf_corrected)}
+        out["tomogram"] = {
+            "glob": f"tomograms/{{run_name}}/{{run_name}}{tomo_src.suffix}",
+            "voxel_spacing": reference.spacing_a,
+            "size": list(reference.size_px),
+            "ctf_corrected": bool(tomo.ctf_corrected),
+        }
     else:
-        candidates = [t for t in (region.tomograms or []) if t.path and not str(t.path).startswith(("http", "s3:")) and (_resolve_doc_path(t.path, doc_dir) or Path("/nonexistent")).exists()]
+        candidates = [
+            t
+            for t in (region.tomograms or [])
+            if t.path
+            and not str(t.path).startswith(("http", "s3:"))
+            and (_resolve_doc_path(t.path, doc_dir) or Path("/nonexistent")).exists()
+        ]
         if candidates:
             t = candidates[0]
             tsrc = _resolve_doc_path(t.path, doc_dir)
+            assert tsrc is not None  # candidates were filtered on an existing resolved path
             d = staging / "tomograms" / run
             d.mkdir(parents=True, exist_ok=True)
             _link(tsrc, d / f"{run}{tsrc.suffix}", overwrite)
             tf = image_frame(t)
-            out["tomogram"] = {"glob": f"tomograms/{{run_name}}/{{run_name}}{tsrc.suffix}", "voxel_spacing": tf.isotropic_spacing,
-                               "size": list(tf.size_px), "ctf_corrected": bool(t.ctf_corrected), "id": t.id}
+            out["tomogram"] = {
+                "glob": f"tomograms/{{run_name}}/{{run_name}}{tsrc.suffix}",
+                "voxel_spacing": tf.isotropic_spacing,
+                "size": list(tf.size_px),
+                "ctf_corrected": bool(t.ctf_corrected),
+                "id": t.id,
+            }
         else:
             sr.warnings.append("no local tomogram file to stage: the tomograms block is left as a TODO")
     tcomp = companion.tomograms.get((out["tomogram"] or {}).get("id", tomo.id)) if companion else None
@@ -191,16 +237,24 @@ def stage_run(
     }
     # collection metadata (mdoc) from the companion, when local
     out["mdoc_glob"] = None
-    mdoc = _resolve_doc_path(comp_ts.collection_metadata_path, doc_dir) if comp_ts and comp_ts.collection_metadata_path else None
+    mdoc = (
+        _resolve_doc_path(comp_ts.collection_metadata_path, doc_dir)
+        if comp_ts and comp_ts.collection_metadata_path
+        else None
+    )
     if mdoc is not None and mdoc.exists() and not str(comp_ts.collection_metadata_path).startswith(("http", "s3:")):
         d = staging / "collection_metadata" / run
         d.mkdir(parents=True, exist_ok=True)
         _link(mdoc, d / f"{run}.mdoc", overwrite)
         out["mdoc_glob"] = "collection_metadata/{run_name}/*.mdoc"
     elif comp_ts and comp_ts.collection_metadata_path:
-        sr.warnings.append(f"collection metadata {comp_ts.collection_metadata_path} is not a local file: collection_metadata block left out (the portal requires one per tilt series)")
+        sr.warnings.append(
+            f"collection metadata {comp_ts.collection_metadata_path} is not a local file: collection_metadata block left out (the portal requires one per tilt series)"
+        )
     else:
-        sr.warnings.append("no acquisition mdoc known: collection_metadata block left out (the portal requires one per tilt series)")
+        sr.warnings.append(
+            "no acquisition mdoc known: collection_metadata block left out (the portal requires one per tilt series)"
+        )
 
     # frames (local movie stacks only)
     frames = []
@@ -225,7 +279,9 @@ def stage_run(
     out["voltage"] = res.optional("voltage", companion=(comp_ts.voltage_kv if comp_ts else None))
     out["cs"] = res.optional("cs", companion=(comp_ts.cs_mm if comp_ts else None))
     out["method_type"] = res.optional("method_type", companion=(comp_aln.method_type if comp_aln else None))
-    out["is_portal_standard"] = res.optional("portal_standard", companion=(comp_aln.is_portal_standard if comp_aln else None))
+    out["is_portal_standard"] = res.optional(
+        "portal_standard", companion=(comp_aln.is_portal_standard if comp_aln else None)
+    )
     out["exposure"] = [comp_images[im.id].exposure_dose if im.id in comp_images else None for im in images]
     out["dark_sections"] = sorted(dark_angles)
     sr.outputs.update({"alignment": str(aln_dir), "rawtlt": str(rawtlt)})
@@ -259,8 +315,14 @@ def _hub_deviation(a: Alignment, b: Alignment) -> float:
     worst = 0.0
     for z, p in sa.items():
         q = sb[z]
-        worst = max(worst, abs(p.tilt_angle - q.tilt_angle), abs(p.tilt_axis_rotation - q.tilt_axis_rotation),
-                    abs(p.volume_x_rotation - q.volume_x_rotation), abs(p.x_offset - q.x_offset), abs(p.y_offset - q.y_offset))
+        worst = max(
+            worst,
+            abs(p.tilt_angle - q.tilt_angle),
+            abs(p.tilt_axis_rotation - q.tilt_axis_rotation),
+            abs(p.volume_x_rotation - q.volume_x_rotation),
+            abs(p.x_offset - q.x_offset),
+            abs(p.y_offset - q.y_offset),
+        )
     return worst
 
 
@@ -283,7 +345,9 @@ def _uniform(runs: List[dict], key: str):
     return vals[0] if all(v == vals[0] for v in vals) else None
 
 
-def build_config(runs: List[dict], *, deposition_id: int, template: Optional[dict], staging: Path) -> Tuple[dict, Optional[List[dict]]]:
+def build_config(
+    runs: List[dict], *, deposition_id: int, template: Optional[dict], staging: Path
+) -> Tuple[dict, Optional[List[dict]]]:
     """The ingestion-config draft and the run_to_data_map rows (None when every value is uniform)."""
     tpl = template or {}
     tsv_cols: Dict[str, List[Any]] = {}
@@ -301,13 +365,29 @@ def build_config(runs: List[dict], *, deposition_id: int, template: Optional[dic
             "deposition_id": int(deposition_id),
             "source_prefix": tpl.get("standardization_config", {}).get("source_prefix", TODO),
         },
-        "datasets": tpl.get("datasets") or [{"metadata": {"dataset_identifier": TODO, "dataset_title": TODO, "dataset_description": TODO,
-                                                          "authors": TODO, "dates": TODO, "sample_type": TODO, "organism": TODO,
-                                                          "cross_references": TODO, "funding": TODO, "grid_preparation": TODO,
-                                                          "sample_preparation": TODO},
-                                             "sources": [{"literal": {"value": [TODO]}}]}],
+        "datasets": tpl.get("datasets")
+        or [
+            {
+                "metadata": {
+                    "dataset_identifier": TODO,
+                    "dataset_title": TODO,
+                    "dataset_description": TODO,
+                    "authors": TODO,
+                    "dates": TODO,
+                    "sample_type": TODO,
+                    "organism": TODO,
+                    "cross_references": TODO,
+                    "funding": TODO,
+                    "grid_preparation": TODO,
+                    "sample_preparation": TODO,
+                },
+                "sources": [{"literal": {"value": [TODO]}}],
+            }
+        ],
         "depositions": [{"sources": [{"literal": {"value": [int(deposition_id)]}}]}],
-        "runs": [{"sources": [{"source_glob": {"list_glob": "alignment/*", "match_regex": ".*", "name_regex": "(.*)"}}]}],
+        "runs": [
+            {"sources": [{"source_glob": {"list_glob": "alignment/*", "match_regex": ".*", "name_regex": "(.*)"}}]}
+        ],
     }
     ts_meta = copy.deepcopy((tpl.get("tiltseries") or [{}])[0].get("metadata", {}))
     derived = {
@@ -318,15 +398,24 @@ def build_config(runs: List[dict], *, deposition_id: int, template: Optional[dic
         "is_aligned": False,
     }
     for k in ("acceleration_voltage", "spherical_aberration_constant"):
-        src = {"acceleration_voltage": "voltage", "spherical_aberration_constant": "cs"}[k]
-        u = _uniform(runs, src)
+        run_key = {"acceleration_voltage": "voltage", "spherical_aberration_constant": "cs"}[k]
+        u = _uniform(runs, run_key)
         if u is not None and k not in ts_meta:
             ts_meta[k] = int(round(u * 1000)) if k == "acceleration_voltage" else u
     tool = _uniform(runs, "tilt_alignment_software")
     if tool and "tilt_alignment_software" not in ts_meta:
         ts_meta["tilt_alignment_software"] = tool
-    for k in ("binning_from_frames", "camera", "microscope", "microscope_optical_setup", "data_acquisition_software",
-              "tilt_alignment_software", "tilt_series_quality", "tilting_scheme", "total_flux"):
+    for k in (
+        "binning_from_frames",
+        "camera",
+        "microscope",
+        "microscope_optical_setup",
+        "data_acquisition_software",
+        "tilt_alignment_software",
+        "tilt_series_quality",
+        "tilting_scheme",
+        "total_flux",
+    ):
         ts_meta.setdefault(k, TODO)
     ts_meta.update(derived)
     tiltseries_glob = _uniform(runs, "tiltseries_glob")
@@ -335,7 +424,9 @@ def build_config(runs: List[dict], *, deposition_id: int, template: Optional[dic
     frames_meta.setdefault("dose_rate", TODO)
     frames_meta.setdefault("is_gain_corrected", TODO)
     if _uniform(runs, "frames_glob"):
-        cfg["frames"] = [{"metadata": frames_meta, "sources": [{"source_glob": {"list_glob": _uniform(runs, "frames_glob")}}]}]
+        cfg["frames"] = [
+            {"metadata": frames_meta, "sources": [{"source_glob": {"list_glob": _uniform(runs, "frames_glob")}}]}
+        ]
     elif _uniform(runs, "mdoc_glob"):
         # the backend requires a frames block next to collection_metadata; no frame files deposited -> literal default
         cfg["frames"] = [{"metadata": frames_meta, "sources": [{"literal": {"value": ["default"]}}]}]
@@ -343,7 +434,9 @@ def build_config(runs: List[dict], *, deposition_id: int, template: Optional[dic
         cfg["collection_metadata"] = [{"sources": [{"source_glob": {"list_glob": _uniform(runs, "mdoc_glob")}}]}]
     cfg["rawtilts"] = [{"sources": [{"source_glob": {"list_glob": "rawtlt/{run_name}/*.rawtlt"}}]}]
     if all(r["ctf"] for r in runs):
-        cfg["ctfs"] = [{"metadata": {"format": "CTFFIND"}, "sources": [{"source_glob": {"list_glob": "ctf/{run_name}/*_CTF.txt"}}]}]
+        cfg["ctfs"] = [
+            {"metadata": {"format": "CTFFIND"}, "sources": [{"source_glob": {"list_glob": "ctf/{run_name}/*_CTF.txt"}}]}
+        ]
     alignments = []
     for fmt in ("ARETOMO3", "IMOD"):
         fmt_runs = [r for r in runs if r["alignment_format"] == fmt]
@@ -353,14 +446,28 @@ def build_config(runs: List[dict], *, deposition_id: int, template: Optional[dic
         if method not in METHOD_TYPES:
             method = TODO
         standard = _uniform(fmt_runs, "is_portal_standard")
-        meta = {"format": fmt, "alignment_type": "GLOBAL", "method_type": method, "is_portal_standard": bool(standard) if standard is not None else TODO}
+        meta = {
+            "format": fmt,
+            "alignment_type": "GLOBAL",
+            "method_type": method,
+            "is_portal_standard": bool(standard) if standard is not None else TODO,
+        }
+        aln_src: Dict[str, Any]
         if fmt == "ARETOMO3":
-            src = {"source_glob": {"list_glob": "alignment/{run_name}/*.aln"}}
+            aln_src = {"source_glob": {"list_glob": "alignment/{run_name}/*.aln"}}
         else:
-            src = {"source_multi_glob": {"list_globs": ["alignment/{run_name}/{run_name}.xf", "alignment/{run_name}/{run_name}.tlt", "alignment/{run_name}/{run_name}.xtilt"]}}
-        block = {"metadata": meta, "sources": [src]}
+            aln_src = {
+                "source_multi_glob": {
+                    "list_globs": [
+                        "alignment/{run_name}/{run_name}.xf",
+                        "alignment/{run_name}/{run_name}.tlt",
+                        "alignment/{run_name}/{run_name}.xtilt",
+                    ]
+                }
+            }
+        block: Dict[str, Any] = {"metadata": meta, "sources": [aln_src]}
         if len(fmt_runs) != len(runs):
-            block["sources"][0]["parent_filters"] = {"include": {"run": [f"^{re.escape(r['run_name'])}$" for r in fmt_runs]}}
+            aln_src["parent_filters"] = {"include": {"run": [f"^{re.escape(r['run_name'])}$" for r in fmt_runs]}}
         alignments.append(block)
     cfg["alignments"] = alignments
     tomo_runs = [r for r in runs if r["tomogram"]]
@@ -369,7 +476,9 @@ def build_config(runs: List[dict], *, deposition_id: int, template: Optional[dic
         voxel = vs["voxel_spacing"] if vs else None
         if voxel is None:
             tsv_cols["voxel_spacing"] = [r["tomogram"]["voxel_spacing"] if r["tomogram"] else "" for r in runs]
-        cfg["voxel_spacings"] = [{"sources": [{"literal": {"value": [round(voxel, 3)] if voxel else ["float {voxel_spacing}"]}}]}]
+        cfg["voxel_spacings"] = [
+            {"sources": [{"literal": {"value": [round(voxel, 3)] if voxel else ["float {voxel_spacing}"]}}]}
+        ]
         tmeta = copy.deepcopy((tpl.get("tomograms") or [{}])[0].get("metadata", {}))
         meta_src = tomo_runs[0]["tomogram_meta"]
         for k in ("processing", "reconstruction_method", "reconstruction_software"):
@@ -388,7 +497,19 @@ def build_config(runs: List[dict], *, deposition_id: int, template: Optional[dic
         tmeta.setdefault("authors", TODO)
         tmeta.setdefault("dates", TODO)
         del meta_src
-        cfg["tomograms"] = [{"metadata": tmeta, "sources": [{"source_glob": {"list_glob": _uniform(runs, "tomograms_glob") or (_uniform(tomo_runs, "tomogram")["glob"] if vs else TODO)}}]}]
+        cfg["tomograms"] = [
+            {
+                "metadata": tmeta,
+                "sources": [
+                    {
+                        "source_glob": {
+                            "list_glob": _uniform(runs, "tomograms_glob")
+                            or (_uniform(tomo_runs, "tomogram")["glob"] if vs else TODO)
+                        }
+                    }
+                ],
+            }
+        ]
     else:
         cfg["voxel_spacings"] = [{"sources": [{"literal": {"value": [TODO]}}]}]
         cfg["tomograms"] = TODO
@@ -402,10 +523,14 @@ def build_config(runs: List[dict], *, deposition_id: int, template: Optional[dic
 def write_config(cfg: dict, rows: Optional[List[dict]], staging: Path) -> Path:
     path = staging / "ingestion_config.yaml"
     text = yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True, width=120)
-    path.write_text(f"# CryoET Data Portal ingestion config DRAFT written by cets-cdp; every '{TODO}' needs curator input\n" + text)
+    path.write_text(
+        f"# CryoET Data Portal ingestion config DRAFT written by cets-cdp; every '{TODO}' needs curator input\n" + text
+    )
     if rows:
         cols = list(rows[0].keys())
-        (staging / "run_to_data_map.tsv").write_text("\t".join(cols) + "\n" + "".join("\t".join(str(r[c]) for c in cols) + "\n" for r in rows))
+        (staging / "run_to_data_map.tsv").write_text(
+            "\t".join(cols) + "\n" + "".join("\t".join(str(r[c]) for c in cols) + "\n" for r in rows)
+        )
     return path
 
 
@@ -489,7 +614,9 @@ def check_schema(cfg: dict, backend_path: Optional[str]) -> Tuple[str, List[str]
         sys.path.remove(str(codegen))
 
 
-def check_extended(config_path: Path, backend_path: Optional[str], conda_env: Optional[str], out_dir: Path) -> Tuple[str, List[str]]:
+def check_extended(
+    config_path: Path, backend_path: Optional[str], conda_env: Optional[str], out_dir: Path
+) -> Tuple[str, List[str]]:
     """The backend's own ``ingestion_config_validate.py`` in its conda env (extended checks)."""
     if not backend_path or not conda_env:
         return "skipped", ["CRYOET_DATA_PORTAL_BACKEND_PATH / CRYOET_DATA_PORTAL_BACKEND_CONDA_ENV not set"]
@@ -503,4 +630,12 @@ def check_extended(config_path: Path, backend_path: Optional[str], conda_env: Op
     return ("passed" if proc.returncode == 0 and not errors else "failed"), msgs
 
 
-__all__ = ["build_config", "check_extended", "check_schema", "check_sources_resolve", "stage_run", "todos", "write_config"]
+__all__ = [
+    "build_config",
+    "check_extended",
+    "check_schema",
+    "check_sources_resolve",
+    "stage_run",
+    "todos",
+    "write_config",
+]

@@ -36,7 +36,18 @@ from cets_cdp.to_cets import portal_to_cets
 
 PACKAGE = "cets-cdp"
 TO_CETS_OPTIONS = {"uri_scheme", "voltage", "cs", "amp_contrast"}
-FROM_CETS_OPTIONS = {"method_type", "portal_standard", "template", "voltage", "cs", "defocus_hand", "no_ctf", "validate", "tiltseries_glob", "tomograms_glob"}
+FROM_CETS_OPTIONS = {
+    "method_type",
+    "portal_standard",
+    "template",
+    "voltage",
+    "cs",
+    "defocus_hand",
+    "no_ctf",
+    "validate",
+    "tiltseries_glob",
+    "tomograms_glob",
+}
 
 
 @click.group()
@@ -47,10 +58,18 @@ def main():
 
 @main.command("to-cets")
 @click.argument("sources", nargs=-1, required=True)
-@click.option("-o", "--output", "output", required=True, type=click.Path(dir_okay=False), help="CETS dataset JSON to write.")
+@click.option(
+    "-o", "--output", "output", required=True, type=click.Path(dir_okay=False), help="CETS dataset JSON to write."
+)
 @click.option("--name", default=None, help="Dataset name (default: the dataset id).")
 @click.option("--uri-scheme", "uri_scheme", type=click.Choice(["https", "s3"]), default=None)
-@click.option("--cache", "cache", type=click.Path(file_okay=False), default=None, help="Cache for fetched metadata [OUT_DIR/.portal].")
+@click.option(
+    "--cache",
+    "cache",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Cache for fetched metadata [OUT_DIR/.portal].",
+)
 @click.option("--voltage", type=float, default=None, help="kV (companion only; default: the portal value).")
 @click.option("--cs", type=float, default=None)
 @click.option("--amp-contrast", "amp_contrast", type=float, default=None)
@@ -110,16 +129,36 @@ def to_cets(sources, output, name, uri_scheme, cache, config_path, overwrite, fa
 @click.option("-o", "--output", "output", required=True, type=click.Path(file_okay=False), help="Staging directory.")
 @click.option("--deposition-id", "deposition_id", type=int, required=True)
 @selection_options
-@click.option("--method-type", "method_type", type=click.Choice(["fiducial_based", "patch_tracking", "projection_matching", "simulated", "undefined"]), default=None)
+@click.option(
+    "--method-type",
+    "method_type",
+    type=click.Choice(["fiducial_based", "patch_tracking", "projection_matching", "simulated", "undefined"]),
+    default=None,
+)
 @click.option("--portal-standard/--no-portal-standard", "portal_standard", default=None)
-@click.option("--template", type=click.Path(exists=True, dir_okay=False), default=None, help="Curator-written config whose dataset/deposition/tiltseries/tomograms metadata is merged in.")
-@click.option("--tiltseries-glob", "tiltseries_glob", default=None, help="Config glob for tilt series that are not staged (e.g. already in the bucket).")
+@click.option(
+    "--template",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Curator-written config whose dataset/deposition/tiltseries/tomograms metadata is merged in.",
+)
+@click.option(
+    "--tiltseries-glob",
+    "tiltseries_glob",
+    default=None,
+    help="Config glob for tilt series that are not staged (e.g. already in the bucket).",
+)
 @click.option("--tomograms-glob", "tomograms_glob", default=None, help="Config glob for tomograms that are not staged.")
 @click.option("--voltage", type=float, default=None)
 @click.option("--cs", type=float, default=None)
 @click.option("--defocus-hand", "defocus_hand", type=click.Choice(["-1", "1"]), default=None)
 @click.option("--no-ctf", "no_ctf", is_flag=True, default=None)
-@click.option("--validate/--no-validate", "validate", default=None, help="Run the backend validators when the backend env vars are set [on].")
+@click.option(
+    "--validate/--no-validate",
+    "validate",
+    default=None,
+    help="Run the backend validators when the backend env vars are set [on].",
+)
 @common_options
 def from_cets(document, output, deposition_id, regions, alignment, tomogram, config_path, overwrite, fail_fast, **cli):
     """Stage alignments/rawtilts/CTFs (+ local data links) and write an ingestion-config draft."""
@@ -144,10 +183,19 @@ def from_cets(document, output, deposition_id, regions, alignment, tomogram, con
         report.series.append(sr)
         try:
             res = make_resolver(PACKAGE, "from-cets", flags, config, region.id, sr)
-            per_run.append(stage_run(
-                region, res, sr, staging=staging, doc_dir=doc.parent, companion=companion,
-                alignment_selector=parse_alignment_selector(alignment), tomogram_selector=tomogram, overwrite=overwrite,
-            ))
+            per_run.append(
+                stage_run(
+                    region,
+                    res,
+                    sr,
+                    staging=staging,
+                    doc_dir=doc.parent,
+                    companion=companion,
+                    alignment_selector=parse_alignment_selector(alignment),
+                    tomogram_selector=tomogram,
+                    overwrite=overwrite,
+                )
+            )
         except Exception as e:  # noqa: BLE001
             sr.error = str(e)
         print_series(sr)
@@ -176,7 +224,10 @@ def from_cets(document, output, deposition_id, regions, alignment, tomogram, con
             schema_status, schema_msgs = "skipped", ["--no-validate"]
             ext_status, ext_msgs = "skipped", ["--no-validate"]
         elif todo:
-            schema_status, schema_msgs = "blocked", [f"{len(todo)} placeholder(s) remain; fill them (or pass --template) first"]
+            schema_status, schema_msgs = (
+                "blocked",
+                [f"{len(todo)} placeholder(s) remain; fill them (or pass --template) first"],
+            )
             ext_status, ext_msgs = "blocked", schema_msgs
         else:
             schema_status, schema_msgs = check_schema(cfg, backend)
@@ -187,7 +238,9 @@ def from_cets(document, output, deposition_id, regions, alignment, tomogram, con
             "extended": {"status": ext_status, "messages": ext_msgs},
             "placeholders": todo,
         }
-        echo(f"validation: sources {'ok' if not problems else 'FAILED'}; schema {schema_status}; extended {ext_status}; {len(todo)} placeholder(s)")
+        echo(
+            f"validation: sources {'ok' if not problems else 'FAILED'}; schema {schema_status}; extended {ext_status}; {len(todo)} placeholder(s)"
+        )
         for p in problems:
             warn(f"   {p}")
         if schema_status == "failed":
