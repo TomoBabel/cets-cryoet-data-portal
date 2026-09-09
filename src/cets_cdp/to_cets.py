@@ -1,7 +1,7 @@
 """Portal run -> CETS ``Region`` (+ companion entries)."""
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 from cryoet_alignment.io.cets import ctf as cets_ctf
@@ -9,6 +9,7 @@ from cryoet_alignment.io.cets.alignment import ReferenceVolume, alignment_to_cet
 from cryoet_alignment.io.cets.cli_support import Gate, SeriesReport
 from cryoet_alignment.io.cets.companion import (
     AlignmentCompanion,
+    AnnotationCompanion,
     ImageCompanion,
     TiltSeriesCompanion,
     TomogramCompanion,
@@ -22,6 +23,7 @@ from cryoet_alignment.io.cets.entities import (
 )
 from cryoet_alignment.io.cets.frames import FRAME_CONVENTIONS, image_frame
 
+from cets_cdp.annotations import DEFAULT_SHAPES, portal_annotations_to_cets
 from cets_cdp.api import PortalRunData, https_to_s3, implied_voxel, pick_alignment, pick_tomogram
 
 
@@ -31,6 +33,7 @@ class SeriesResult:
     tilt_series_companion: TiltSeriesCompanion
     alignment_companion: Optional[AlignmentCompanion]
     tomogram_companions: Dict[str, TomogramCompanion]
+    annotation_companions: Dict[str, AnnotationCompanion] = field(default_factory=dict)
 
 
 def _is_identity(m: Optional[list]) -> bool:
@@ -53,6 +56,8 @@ def portal_to_cets(
     *,
     alignment_id: Optional[int] = None,
     voxel: Optional[float] = None,
+    annotations: bool = True,
+    annotation_shapes: Sequence[str] = DEFAULT_SHAPES,
 ) -> SeriesResult:
     stem = data.run_name
     scheme = res.value("uri_scheme", default="https")
@@ -113,6 +118,7 @@ def portal_to_cets(
     tomograms: List[Any] = []
     tomo_comps: Dict[str, TomogramCompanion] = {}
     ref_tomo = None
+    tomograms_by_portal_id: Dict[int, Any] = {}
     for t in data.tomograms:
         tomo = tomogram_entity(
             tomogram_id=f"{stem}_tomo_{t.id}",
@@ -123,6 +129,7 @@ def portal_to_cets(
             ctf_corrected=bool(t.ctf_corrected),
         )
         tomograms.append(tomo)
+        tomograms_by_portal_id[t.id] = tomo
         tomo_comps[tomo.id] = TomogramCompanion(
             voxel_header_a=t.voxel_spacing,
             voxel_implied_a=implied_voxel(data, t),
@@ -254,8 +261,31 @@ def portal_to_cets(
         collection_metadata_path=_uri(data.mdoc_url, scheme),
         images=images,
     )
+    ann_entities: List[Any] = []
+    ann_comps: Dict[str, AnnotationCompanion] = {}
+    if annotations and data.annotations:
+        imported = portal_annotations_to_cets(
+            data,
+            tomograms_by_portal_id,
+            sr,
+            alignment_id=aln.id if aln is not None else None,
+            shapes=annotation_shapes,
+            scheme=scheme,
+        )
+        ann_entities = imported.entities
+        ann_comps = imported.companions
+        res.resolve(
+            "annotations",
+            discovered=len(ann_entities),
+            note=f"of {sum(len(a.files) for a in data.annotations)} portal annotation files",
+        )
     region = region_entity(
-        region_id=stem, tilt_series=[ts], alignments=alignments, tomograms=tomograms, movie_stack_series=movie_series
+        region_id=stem,
+        tilt_series=[ts],
+        alignments=alignments,
+        tomograms=tomograms,
+        movie_stack_series=movie_series,
+        annotations=ann_entities,
     )
     sr.provenance = res.provenance()
-    return SeriesResult(region, ts_comp, aln_comp, tomo_comps)
+    return SeriesResult(region, ts_comp, aln_comp, tomo_comps, ann_comps)

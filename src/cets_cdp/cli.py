@@ -22,6 +22,7 @@ from cryoet_alignment.io.cets.companion import Companion
 from cryoet_alignment.io.cets.entities import dataset_entity, dump_json, load_dataset, validate_document
 
 from cets_cdp import __version__
+from cets_cdp.annotations import DEFAULT_SHAPES
 from cets_cdp.api import fetch_run, find_runs, parse_portal_source, portal_client
 from cets_cdp.from_cets import (
     build_config,
@@ -79,14 +80,28 @@ def main():
 @click.option("--voltage", type=float, default=None, help="kV (companion only; default: the portal value).")
 @click.option("--cs", type=float, default=None, help="mm (companion only; default: the portal value).")
 @click.option("--amp-contrast", "amp_contrast", type=float, default=None, help="Amplitude contrast (companion only).")
+@click.option(
+    "--annotations/--no-annotations",
+    "annotations",
+    default=True,
+    help="Convert the runs' point annotations and segmentation masks [on].",
+)
+@click.option(
+    "--annotation-shapes",
+    "annotation_shapes",
+    default=None,
+    help="Comma-separated portal shape types to convert [Point,OrientedPoint,InstanceSegmentation,SegmentationMask,...].",
+)
 @common_options
-def to_cets(sources, output, name, uri_scheme, cache, config_path, overwrite, fail_fast, **cli):
-    """Convert portal runs (portal:<dataset>[/<run>][@alignment=ID,voxel=A]) to a CETS dataset JSON."""
+def to_cets(
+    sources, output, name, uri_scheme, cache, config_path, overwrite, fail_fast, annotations, annotation_shapes, **cli
+):
+    """Convert portal runs (portal:<dataset>[/<run>][@alignment=ID,voxel=A,annotations=all|none|ID+ID]) to a CETS dataset JSON."""
     out = Path(output)
     if out.exists() and not overwrite:
         raise click.ClickException(f"{out} exists (use --overwrite)")
     out.parent.mkdir(parents=True, exist_ok=True)
-    config = load_config(config_path, TO_CETS_OPTIONS)
+    config = load_config(config_path, TO_CETS_OPTIONS, PACKAGE, "to-cets")
     flags = {k: v for k, v in cli.items() if v is not None}
     if uri_scheme:
         flags["uri_scheme"] = uri_scheme
@@ -98,16 +113,28 @@ def to_cets(sources, output, name, uri_scheme, cache, config_path, overwrite, fa
     client = portal_client()
     report = Report(PACKAGE, "to-cets")
     companion = Companion(generator=f"{PACKAGE} {__version__}")
+    shapes = (
+        tuple(v.strip() for v in annotation_shapes.split(",") if v.strip()) if annotation_shapes else DEFAULT_SHAPES
+    )
     regions = []
     dataset_ids = set()
     for spec in specs:
+        want_ann = spec.annotations if annotations else "none"
         for run in find_runs(client, spec):
             sr = SeriesReport(run.name)
             report.series.append(sr)
             try:
-                data = fetch_run(client, run, cache_dir=cache_dir)
+                data = fetch_run(client, run, cache_dir=cache_dir, annotations=want_ann)
                 res = make_resolver(PACKAGE, "to-cets", flags, config, run.name, sr)
-                result = portal_to_cets(data, res, sr, alignment_id=spec.alignment_id, voxel=spec.voxel_spacing)
+                result = portal_to_cets(
+                    data,
+                    res,
+                    sr,
+                    alignment_id=spec.alignment_id,
+                    voxel=spec.voxel_spacing,
+                    annotations=want_ann != "none",
+                    annotation_shapes=shapes,
+                )
             except Exception as e:  # noqa: BLE001
                 sr.error = str(e)
                 print_series(sr)
@@ -120,6 +147,7 @@ def to_cets(sources, output, name, uri_scheme, cache, config_path, overwrite, fa
             if result.alignment_companion is not None:
                 companion.alignments.append(result.alignment_companion)
             companion.tomograms.update(result.tomogram_companions)
+            companion.annotations.update(result.annotation_companions)
             print_series(sr)
     if regions:
         ds = dataset_entity(name or ("-".join(str(d) for d in sorted(dataset_ids))), regions)
@@ -177,9 +205,29 @@ def to_cets(sources, output, name, uri_scheme, cache, config_path, overwrite, fa
     default=None,
     help="Run the backend validators when the backend env vars are set [on].",
 )
+@click.option(
+    "--annotations/--no-annotations",
+    "annotations",
+    default=True,
+    help="Stage point annotations (relion4 stars) and local masks, and draft their config blocks [on].",
+)
+@click.option("--annotation", "annotation_ids", multiple=True, help="Annotation id(s) to stage (default: all).")
 @common_options
-def from_cets(document, output, deposition_id, regions, alignment, tomogram, config_path, overwrite, fail_fast, **cli):
-    """Stage alignments/rawtilts/CTFs (+ local data links) and write an ingestion-config draft."""
+def from_cets(
+    document,
+    output,
+    deposition_id,
+    regions,
+    alignment,
+    tomogram,
+    config_path,
+    overwrite,
+    fail_fast,
+    annotations,
+    annotation_ids,
+    **cli,
+):
+    """Stage alignments/rawtilts/CTFs/annotations (+ local data links) and write an ingestion-config draft."""
     import yaml
 
     doc = Path(document)
@@ -187,7 +235,7 @@ def from_cets(document, output, deposition_id, regions, alignment, tomogram, con
     companion = Companion.load_for(doc)
     staging = Path(output)
     staging.mkdir(parents=True, exist_ok=True)
-    config = load_config(config_path, FROM_CETS_OPTIONS)
+    config = load_config(config_path, FROM_CETS_OPTIONS, PACKAGE, "from-cets")
     flags = {k: v for k, v in cli.items() if v is not None}
     if "defocus_hand" in flags:
         flags["defocus_hand"] = int(flags["defocus_hand"])
@@ -212,6 +260,8 @@ def from_cets(document, output, deposition_id, regions, alignment, tomogram, con
                     alignment_selector=parse_alignment_selector(alignment),
                     tomogram_selector=tomogram,
                     overwrite=overwrite,
+                    annotations=annotations,
+                    annotation_ids=list(annotation_ids),
                 )
             )
         except Exception as e:  # noqa: BLE001

@@ -15,6 +15,7 @@ from cryoet_alignment.io.cets.companion import Companion
 from cryoet_alignment.io.cets.config import Resolver
 from cryoet_alignment.io.cets.entities import dataset_entity, dump_json, load_dataset, validate_document
 
+from cets_cdp.annotations import read_ndjson_points, relion4_star_to_points
 from cets_cdp.api import PortalRunData, parse_portal_source, run_data_from_json
 from cets_cdp.cli import main
 from cets_cdp.from_cets import TODO, build_config, check_schema, check_sources_resolve, todos
@@ -33,7 +34,12 @@ def _run(args, expect_ok=True):
 
 @pytest.fixture
 def data() -> PortalRunData:
-    return run_data_from_json(json.loads((DATA / "10445_TS_105_5.json").read_text()))
+    d = run_data_from_json(json.loads((DATA / "10445_TS_105_5.json").read_text()))
+    for a in d.annotations:  # recorded ndjson files live under tests/data
+        for f in a.files:
+            if f.local_path and not Path(f.local_path).is_absolute():
+                f.local_path = str(DATA / f.local_path)
+    return d
 
 
 def _to_cets(data: PortalRunData, out: Path, **kw):
@@ -48,6 +54,7 @@ def _to_cets(data: PortalRunData, out: Path, **kw):
         tilt_series={RUN: result.tilt_series_companion},
         alignments=[result.alignment_companion],
         tomograms=result.tomogram_companions,
+        annotations=result.annotation_companions,
     )
     comp.dump(Companion.path_for(out))
     return ds, comp, sr
@@ -243,3 +250,123 @@ def test_live_portal(tmp_path):
     live_shift = ds.regions[0].alignments[0].projection_alignments[0].sequence[2].translation
     p = recorded.alignments[0].hub.per_section_alignment_parameters[0]
     assert live_shift == pytest.approx([p.x_offset * 1.54, p.y_offset * 1.54])
+
+
+# ------------------------------------------------------------------ annotations
+
+
+def test_recorded_annotations_to_cets(data, tmp_path):
+    """Points: ``p = (loc - floor(N/2)) * s`` on the bound 4.99 A tomogram, matrices as stored; the mask keeps the
+    tomogram grid read from the zarr metadata; the companion carries the ingestion metadata verbatim."""
+    from cryoet_alignment.io.cets.annotations import annotation_kind, annotation_points
+
+    ds, comp, sr = _to_cets(data, tmp_path / "10445.cets.json")
+    region = ds.regions[0]
+    kinds = {a.id: annotation_kind(a) for a in region.annotations}
+    assert kinds == {
+        "TS_105_5_tomo_18956_ann_69545_segmentationmask": "mask",
+        "TS_105_5_tomo_18956_ann_69546_point": "points",
+        "TS_105_5_tomo_18956_ann_69547_point": "points",
+        "TS_105_5_tomo_18956_ann_175505_orientedpoint": "oriented_points",
+    }
+    for ann in region.annotations:
+        if kinds[ann.id] == "mask":
+            assert (ann.width, ann.height, ann.depth) == (1260, 1260, 368)
+            assert ann.coordinate_transformations[0].sequence[1].scale == [4.99, 4.99, 4.99]
+            assert ann.path.endswith("membrane-1.0_segmentationmask.zarr")
+            assert comp.annotations[ann.id].mrc_path.endswith(".mrc") and comp.annotations[ann.id].mask_label == 1
+            continue
+        pid = int(ann.id.split("_ann_")[1].split("_")[0])
+        nd = read_ndjson_points(
+            DATA / "annotations" / f"{pid}_{'OrientedPoint' if kinds[ann.id] == 'oriented_points' else 'Point'}.ndjson"
+        )
+        r = annotation_points(ann, region)
+        expect = (nd.locations - np.array([630.0, 630.0, 184.0])) * 4.99
+        assert np.abs(r.points_a - expect).max() < 1e-9
+        assert np.abs(r.points_corner_a / 4.99 - nd.locations).max() < 1e-9
+        if nd.matrices is not None:
+            assert np.abs(r.matrices - nd.matrices).max() < 1e-12  # the portal matrix IS the particle->tomogram matrix
+        c = comp.annotations[ann.id]
+        assert c.portal_annotation_id == pid and c.metadata["annotation_ingest_id"] and c.voxel_spacing_a == 4.99
+    assert any(g.name == "mask_grid_matches_tomogram" and g.passed for g in sr.gates)
+    assert "annotations" in [p["option"] for p in sr.provenance]
+
+
+def test_annotations_staged_as_relion4_stars_and_config_blocks(data, tmp_path):
+    out = tmp_path / "10445.cets.json"
+    _to_cets(data, out)
+    stage = tmp_path / "stage"
+    r = _run(["from-cets", str(out), "-o", str(stage), "--deposition-id", "1", "--no-validate"])
+    assert "[ok ] backend_point_parser_reproduces_points" in r.stdout
+    assert "[ok ] backend_point_parser_reproduces_rotations" in r.stdout
+    assert "mask file is not local" in r.stderr
+    stars = sorted((stage / "annotations" / RUN).glob("*.star"))
+    assert [p.name for p in stars] == [
+        "10310_beta-amylase-1_point.star",
+        "10310_ferritin-complex-1_point.star",
+        "10358_apo-ferritin-octopi-1_orientedpoint.star",
+    ]
+    loc, mats = relion4_star_to_points(stars[2])  # the backend's own relion4 arithmetic
+    nd = read_ndjson_points(DATA / "annotations" / "175505_OrientedPoint.ndjson")
+    assert np.abs(loc - nd.locations).max() < 1e-6
+    assert np.abs(np.einsum("nij,nkj->nik", mats, nd.matrices) - np.eye(3)).max() < 1e-6
+    cfg = yaml.safe_load((stage / "ingestion_config.yaml").read_text())
+    blocks = cfg["annotations"]
+    assert len(blocks) == 4
+    by_glob = {next(iter(b["sources"][0].values())).get("glob_string"): b for b in blocks}
+    ori = by_glob["annotations/{run_name}/10358_apo-ferritin-octopi-1_orientedpoint.star"]
+    assert (
+        set(ori["sources"][0]) == {"OrientedPoint"}
+        and ori["sources"][0]["OrientedPoint"]["file_format"] == "relion4_star"
+    )
+    assert ori["sources"][0]["OrientedPoint"]["order"] == "xyz" and "columns" not in ori["sources"][0]["OrientedPoint"]
+    assert ori["metadata"]["annotation_ingest_id"] == "apo-ferritin-octopi-1" and "files" not in ori["metadata"]
+    pt = by_glob["annotations/{run_name}/10310_ferritin-complex-1_point.star"]
+    assert pt["sources"][0]["Point"]["columns"] == "xyz" and pt["metadata"]["annotation_object"]["id"] == "GO:0070288"
+    mask = by_glob[TODO]
+    assert (
+        set(mask["sources"][0]) == {"SemanticSegmentationMask"}
+        and mask["sources"][0]["SemanticSegmentationMask"]["mask_label"] == 1
+    )
+    assert "annotations: source glob is a TODO" in r.stdout + r.stderr
+    # only one annotation, and none at all
+    stage2 = tmp_path / "stage2"
+    _run(
+        [
+            "from-cets",
+            str(out),
+            "-o",
+            str(stage2),
+            "--deposition-id",
+            "1",
+            "--no-validate",
+            "--annotation",
+            "TS_105_5_tomo_18956_ann_69547_point",
+        ]
+    )
+    assert [p.name for p in (stage2 / "annotations" / RUN).glob("*")] == ["10310_beta-amylase-1_point.star"]
+    stage3 = tmp_path / "stage3"
+    _run(["from-cets", str(out), "-o", str(stage3), "--deposition-id", "1", "--no-validate", "--no-annotations"])
+    assert not (stage3 / "annotations").exists() and "annotations" not in yaml.safe_load(
+        (stage3 / "ingestion_config.yaml").read_text()
+    )
+
+
+@pytest.mark.skipif(not os.environ.get("CRYOET_DATA_PORTAL_BACKEND_PATH"), reason="set CRYOET_DATA_PORTAL_BACKEND_PATH")
+def test_annotation_blocks_validate_against_backend_models(data, tmp_path):
+    import sys
+
+    out = tmp_path / "10445.cets.json"
+    _to_cets(data, out)
+    stage = tmp_path / "stage"
+    _run(["from-cets", str(out), "-o", str(stage), "--deposition-id", "1", "--no-validate"])
+    cfg = yaml.safe_load((stage / "ingestion_config.yaml").read_text())
+    codegen = Path(os.environ["CRYOET_DATA_PORTAL_BACKEND_PATH"]) / "schema" / "ingestion_config" / "v1.0.0" / "codegen"
+    sys.path.insert(0, str(codegen))
+    try:
+        from ingestion_config_models import AnnotationEntity  # type: ignore
+
+        for block in cfg["annotations"]:
+            AnnotationEntity.model_validate(block)
+    finally:
+        sys.path.remove(str(codegen))

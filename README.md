@@ -6,11 +6,12 @@ The package implements the rigid profile `cets-rigid/0.1` of CETS, documented in
 [`cryoet-alignment/docs/cets.md`](https://github.com/uermel/cryoet-alignment/blob/uermel/cets/docs/cets.md).
 The command is `cets-cdp`.
 
-- `cets-cdp to-cets` reads runs through the portal API client and writes one CETS dataset. A whole
-  portal dataset, single runs, or a specific alignment and reference tomogram can be requested.
-- `cets-cdp from-cets` writes a staging directory in the shape portal ingestion configs expect, plus a
-  draft `ingestion_config.yaml` with the derived values filled in and everything else marked for the
-  curator. Nothing is inferred.
+- `cets-cdp to-cets` reads runs through the portal API client and writes one CETS dataset: tilt series,
+  alignment, tomograms, and the runs' point annotations and segmentation masks. A whole portal dataset,
+  single runs, or a specific alignment, reference tomogram and set of annotations can be requested.
+- `cets-cdp from-cets` writes a staging directory in the shape portal ingestion configs expect (alignments,
+  tilt angles, CTFs, annotations as RELION stars, local masks), plus a draft `ingestion_config.yaml` with
+  the derived values filled in and everything else marked for the curator. Nothing is inferred.
 
 The portal's rigid per-section parameters (the `alignment_metadata.json` written at ingestion) are the
 hub model of the codec, so portal to CETS to `.aln` reproduces the portal's own alignment file.
@@ -40,10 +41,13 @@ portal:<dataset>                              every run of the dataset
 portal:<dataset>/<run>                        one run
 portal:<dataset>/<run>@alignment=<id>         one run, a specific alignment
 portal:<dataset>/<run>@alignment=<id>,voxel=<Å>  ... and the reference tomogram by voxel spacing
+portal:<dataset>/<run>@annotations=69546+69547   only these annotations (ids joined by +); all | none
 ```
 
 Without `@alignment=` the portal-standard alignment with the lowest id is used. Without `@voxel=` the
-reference tomogram is the portal-standard one at the finest voxel spacing.
+reference tomogram is the portal-standard one at the finest voxel spacing. Without `@annotations=` every
+annotation of the run is converted (`--no-annotations` turns them off, `--annotation-shapes` narrows the
+shapes).
 
 What is read per run:
 
@@ -56,6 +60,9 @@ Alignment           alignment_metadata.json (per-section rotation, tilt, offsets
                     affine_transformation_matrix / volume_offset (refused unless identity / zero)
 Tomogram            voxel_spacing, size, processing, reconstruction_method, ctf_corrected, https paths
 FrameAcquisitionFile  the mdoc URL (companion, for the ingestion draft)
+Annotation          object, method, ground truth / curator flags, the metadata json (= the ingestion block)
+AnnotationFile      shape type, format, voxel spacing it was made on, alignment; ndjson points are cached,
+                    masks are described from the zarr metadata (or the MRC header) without download
 ```
 
 ### Example
@@ -74,6 +81,12 @@ What happens per run:
    centred physical frames, with AreTomo3's centre convention corrected on the way in.
 4. Acquisition order, per-image exposure, kV/Cs, the tilt axis, `processing`, `reconstruction_method`
    and the mdoc URL go to the companion.
+5. Each annotation file binds to the region's tomogram it was made on (same portal voxel spacing). Point
+   files become `PointSet3D` / `PointMatrixSet3D`: the ndjson locations are voxel indices, so
+   `p = (location − ⌊N/2⌋) · s` puts them into the tomogram's centred frame; `xyz_rotation_matrix` is
+   RELION's particle-to-tomogram matrix and is kept as is. Masks become `SegmentationMask3D` entities
+   referencing the zarr by URL, with the grid read from `.zattrs` and `0/.zarray`. The portal metadata json,
+   object, method and the MRC twin go to the companion.
 
 Console output (abridged):
 
@@ -86,7 +99,10 @@ Console output (abridged):
    cs = 2.7  [discovered]  (TiltSeries.spherical_aberration_constant)
    [ok ] portal_volume_box_vs_reference_tomogram value={'x': 6287.4, 'y': 6287.4, 'z': 1836.32} expected={...}
    [ok ] rows value=31
+   annotations = 70  [discovered]  (of 71 portal annotation files)
+   [ok ] mask_grid_matches_tomogram value=1 expected=1
    WARNING: uri_scheme defaulted to 'https'; set it with --uri-scheme or config key series.TS_105_5.uri_scheme
+   WARNING: 5 of 2575 annotation points lie outside their tomogram grid
    dropped: LOCAL alignment: the portal metadata carries the rigid per-section parameters only
 wrote cets/10445.cets.json (1 region(s)) + 10445.cets-companion.json
 report: cets/10445.cets.report.json
@@ -96,11 +112,13 @@ Output:
 
 ```
 cets/
-├── 10445.cets.json            # one Region per run: tilt series, movie stacks, alignment "portal<id>", tomograms
+├── 10445.cets.json            # one Region per run: tilt series, movie stacks, alignment "portal<id>", tomograms,
+│                              #   annotations "<tomogram id>_ann_<annotation id>_<shape>"
 ├── 10445.cets-companion.json  # acquisition order, exposure, kV/Cs, tilt axis, processing, method type,
-│                              #   is_portal_standard, mdoc URL, header vs implied voxels, what was dropped
+│                              #   is_portal_standard, mdoc URL, header vs implied voxels, per annotation the
+│                              #   portal ids, object, method, metadata json, file URLs, what was dropped
 ├── 10445.cets.report.json     # per run: provenance of every value, gates, warnings, errors
-└── .portal/                   # cached alignment_metadata.json per run (--cache DIR to move it)
+└── .portal/                   # cached alignment_metadata.json, annotation metadata and ndjson per run
 ```
 
 More examples:
@@ -114,6 +132,11 @@ cets-cdp to-cets portal:10445/TS_105_5 portal:10445/TS_106_1 -o cets/two.cets.js
 
 # the reference tomogram at a coarser voxel spacing than the portal-standard one
 cets-cdp to-cets "portal:10445/TS_105_5@voxel=10.012" -o cets/10445_coarse.cets.json
+
+# only the membrane mask and one pick set; or points only; or no annotations
+cets-cdp to-cets "portal:10445/TS_105_5@annotations=69545+69546" -o cets/10445.cets.json
+cets-cdp to-cets portal:10445 -o cets/10445.cets.json --annotation-shapes Point,OrientedPoint
+cets-cdp to-cets portal:10445 -o cets/10445.cets.json --no-annotations
 ```
 
 ## CETS to portal staging
@@ -135,9 +158,17 @@ What happens per region:
    are written.
 4. Local tilt series, tomogram, mdoc and frame files named by the document or the companion are
    symlinked into the staging tree. Remote paths are not fetched.
-5. The config draft is assembled: derived values (pixel spacing, tilt axis, tilt range and step,
+5. Point annotations are staged as `relion4_star` files (coordinates in voxels of their tomogram,
+   `rlnOrigin*Angst` 0, Eulers from the matrices, `rlnImagePixelSize` = the voxel size): the backend's own
+   relion4 arithmetic is replayed on the staged file and must give the original locations and matrices
+   (gate `backend_point_parser_reproduces_points`). Local masks are symlinked; remote masks leave a block
+   whose source is a `TODO`.
+6. The config draft is assembled: derived values (pixel spacing, tilt axis, tilt range and step,
    alignment block per format, CTF, rawtilt, voxel spacing) are filled; per-run values that differ go to
-   `run_to_data_map.tsv`; everything else comes from `--template` or stays `TODO(curator)`.
+   `run_to_data_map.tsv`; everything else comes from `--template` or stays `TODO(curator)`. Annotation
+   blocks carry the portal's metadata verbatim (minus ingestion outputs) when the annotation came from the
+   portal, else the template's block for the same object, else placeholders; annotations with identical
+   metadata share one block across runs.
 6. Three checks run and are reported separately: every source glob resolves in the staging tree; the
    backend's generated schema (in-process); the backend's extended validator (in its conda env). The two
    backend checks are reported as blocked while placeholders remain, and skipped without the backend.
@@ -154,7 +185,11 @@ Console output (abridged):
    [ok ] x_rotation value=0.0  staged as .aln
    [ok ] backend_parser_reproduces_hub value=1.1e-13 expected='< 1e-3 (px / deg; file precision)'
    [ok ] ctf_parses_with_one_header_line expected=31
+   annotations_staged = '69/70'  [discovered]  (annotations/<run>/)
+   [ok ] backend_point_parser_reproduces_points value=5.0e-07 expected='< 1e-6 voxel (relion4_star arithmetic, binning 1)'
+   [ok ] backend_point_parser_reproduces_rotations value=4.6e-08 expected='< 1e-6 (|R_out R_in^T - I|)'
    WARNING: no local tomogram file to stage: the tomograms block is left as a TODO
+   WARNING: annotation TS_105_5_tomo_18956_ann_69545_segmentationmask: mask file is not local (https://...): source left as TODO
 wrote staging/ingestion_config.yaml
 TODO(curator): standardization_config.source_prefix
 TODO(curator): datasets[0].metadata.dataset_title
@@ -174,6 +209,8 @@ staging/
 ├── ctf/TS_01/TS_01_CTF.txt                   # when every image carries CTF metadata
 ├── tiltseries/TS_01/TS_01.mrc -> ...         # symlink when the document's path is local
 ├── tomograms/TS_01/TS_01.mrc -> ...          # symlink when the tomogram path is local
+├── annotations/TS_01/10310_ferritin-complex-1_point.star          # relion4_star per point annotation (<deposition>_<ingest id>_<shape>)
+├── annotations/TS_01/10310_membrane-1_segmentationmask.zarr -> ...  # symlink when the mask is local
 ├── collection_metadata/TS_01/TS_01.mdoc -> ...   # symlink when the companion names a local mdoc
 ├── frames/TS_01/... -> ...                   # symlinks when the movie stacks are local
 ├── run_to_data_map.tsv                       # per-run values when they differ between runs
@@ -197,6 +234,13 @@ rawtilts:
 ctfs:
   - metadata: {format: CTFFIND}
     sources: [{source_glob: {list_glob: 'ctf/{run_name}/*_CTF.txt'}}]
+annotations:
+  - metadata: {annotation_ingest_id: ferritin-complex-1, annotation_object: {id: 'GO:0070288', name: ferritin complex},
+               annotation_method: ..., method_type: automated, authors: [...], dates: {...}, version: 1.0}
+    sources: [{OrientedPoint: {file_format: relion4_star, binning: 1, order: xyz,
+               glob_string: 'annotations/{run_name}/10358_apo-ferritin-octopi-1_orientedpoint.star', is_visualization_default: true}}]
+  - metadata: {annotation_ingest_id: membrane-1, annotation_object: {id: 'GO:0016020', name: membrane}, ...}
+    sources: [{SemanticSegmentationMask: {file_format: zarr, mask_label: 1, glob_string: TODO(curator)}}]
 ```
 
 The backend rules the draft follows: a `tiltseries` block needs a `collection_metadata` block, which in
@@ -240,6 +284,8 @@ cets-cdp to-cets [OPTIONS] SOURCES...
 | `--uri-scheme https\|s3` | scheme of the paths written into the document | `https`, with a warning |
 | `--cache DIR` | cache for fetched `alignment_metadata.json` | `OUT_DIR/.portal` |
 | `--voltage kV`, `--cs mm`, `--amp-contrast F` | companion values only | portal kV / Cs; amplitude contrast absent |
+| `--annotations / --no-annotations` | convert the runs' annotations | on (`@annotations=` in the source narrows them) |
+| `--annotation-shapes LIST` | comma-separated portal shape types | `Point,OrientedPoint,InstanceSegmentation,SegmentationMask,InstanceSegmentationMask,SemanticSegmentationMask` |
 | `--fail-fast` | stop at the first failing run | continue, exit 1 at the end |
 | `--overwrite` | replace existing outputs | error when outputs exist |
 | `--config FILE` | YAML config with overrides (see below) | |
@@ -267,6 +313,8 @@ cets-cdp from-cets [OPTIONS] DOCUMENT
 | `--voltage kV`, `--cs mm` | tiltseries metadata | companion |
 | `--defocus-hand -1\|1` | defocus handedness of the staged `_CTF.txt` | companion; column omitted otherwise |
 | `--no-ctf` | do not stage CTFs | off |
+| `--annotations / --no-annotations` | stage point annotations and local masks, draft their blocks | on |
+| `--annotation ID` | annotation id(s) to stage; repeatable | all |
 | `--validate / --no-validate` | run the backend validators when the env vars are set | on |
 | `--fail-fast`, `--overwrite`, `--config FILE` | as above | |
 
@@ -303,6 +351,9 @@ cets-cdp from-cets cets/at3.cets.json -o staging/ --deposition-id 10301 --config
 - LOCAL alignments contribute their rigid per-section parameters; the local part is noted as dropped.
 - Nothing in the ingestion draft is inferred: `processing`, `reconstruction_method`, camera, microscope,
   software and the dataset metadata come from the companion or the template, or stay placeholders.
+- Annotation files attached to another alignment than the exported one, or to a voxel spacing without a
+  tomogram in the region, are skipped with a warning. Points outside their tomogram grid are kept and counted.
+- Grid offsets between reconstruction engines are not modelled: every tomogram grid is taken as corner-anchored.
 
 ## Development
 

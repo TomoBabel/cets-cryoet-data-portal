@@ -24,7 +24,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import yaml
@@ -63,6 +63,8 @@ def stage_run(
     alignment_selector=None,
     tomogram_selector: Optional[str] = None,
     overwrite: bool = False,
+    annotations: bool = True,
+    annotation_ids: Sequence[str] = (),
 ) -> Dict[str, Any]:
     """Stage one region; returns the per-run values the config needs."""
     cets_alignment = select_alignment(region, alignment_selector)
@@ -284,6 +286,26 @@ def stage_run(
     )
     out["exposure"] = [comp_images[im.id].exposure_dose if im.id in comp_images else None for im in images]
     out["dark_sections"] = sorted(dark_angles)
+    out["annotations"] = []
+    if annotations and (region.annotations or []):
+        from cets_cdp.annotations import stage_annotations
+
+        out["annotations"] = stage_annotations(
+            region,
+            companion.annotations if companion else {},
+            sr,
+            staging=staging,
+            doc_dir=doc_dir,
+            run=run,
+            annotation_ids=annotation_ids,
+            overwrite=overwrite,
+        )
+        staged = [a for a in out["annotations"] if a.glob_rel]
+        res.resolve(
+            "annotations_staged", discovered=f"{len(staged)}/{len(out['annotations'])}", note="annotations/<run>/"
+        )
+        if staged:
+            sr.outputs["annotations"] = str(staging / "annotations" / run)
     sr.outputs.update({"alignment": str(aln_dir), "rawtlt": str(rawtlt)})
     sr.provenance = res.provenance()
     return out
@@ -513,6 +535,11 @@ def build_config(
     else:
         cfg["voxel_spacings"] = [{"sources": [{"literal": {"value": [TODO]}}]}]
         cfg["tomograms"] = TODO
+    staged_by_run = {r["run_name"]: r.get("annotations") or [] for r in runs}
+    if any(staged_by_run.values()):
+        from cets_cdp.annotations import annotation_blocks
+
+        cfg["annotations"] = annotation_blocks(staged_by_run, tpl)
     rows = None
     if tsv_cols:
         rows = [{"run_name": r["run_name"], **{k: tsv_cols[k][i] for k in tsv_cols}} for i, r in enumerate(runs)]
@@ -554,7 +581,16 @@ def check_sources_resolve(cfg: dict, staging: Path, runs: List[dict], rows: Opti
     """Every glob (with {run_name} and TSV placeholders substituted) must match at least one file per run."""
     problems = []
     table = {r["run_name"]: r for r in (rows or [])}
-    for block_name in ("tiltseries", "frames", "collection_metadata", "rawtilts", "ctfs", "alignments", "tomograms"):
+    for block_name in (
+        "tiltseries",
+        "frames",
+        "collection_metadata",
+        "rawtilts",
+        "ctfs",
+        "alignments",
+        "tomograms",
+        "annotations",
+    ):
         block = cfg.get(block_name)
         if not isinstance(block, list):
             continue
@@ -565,6 +601,12 @@ def check_sources_resolve(cfg: dict, staging: Path, runs: List[dict], rows: Opti
                     globs = [src["source_glob"]["list_glob"]]
                 elif "source_multi_glob" in src:
                     globs = list(src["source_multi_glob"]["list_globs"])
+                elif block_name == "annotations":
+                    shape = next((v for k, v in src.items() if isinstance(v, dict) and "file_format" in v), None)
+                    if shape is not None:
+                        globs = (
+                            [shape["glob_string"]] if "glob_string" in shape else list(shape.get("glob_strings", []))
+                        )
                 include = src.get("parent_filters", {}).get("include", {}).get("run")
                 for r in runs:
                     if include and not any(re.match(p, r["run_name"]) for p in include):

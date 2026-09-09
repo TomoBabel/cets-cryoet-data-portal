@@ -10,13 +10,21 @@ https_alignment_metadata}`` and ``Tomogram{id, voxel_spacing, size_x/y/z, proces
 reconstruction_method, reconstruction_software, is_portal_standard, https_mrc_file, https_omezarr_dir}``.
 The hub alignment is built from the ``alignment_metadata.json`` the ingestion wrote (identical to what the
 API serves; per-section offsets are in PIXELS despite the schema docstring).
+
+Annotations: ``Annotation{id, object_name/id/state, annotation_method, method_type, ground_truth_status,
+is_curator_recommended, annotation_software, confidence_*, https_metadata_path}`` → ``AnnotationShape{shape_type}``
+→ ``AnnotationFile{format, https_path, tomogram_voxel_spacing_id, alignment_id, is_visualization_default, source}``.
+Point files (ndjson) are small and are downloaded into the cache; masks (zarr + mrc) are described from
+``<zarr>/.zattrs`` + ``<zarr>/0/.zarray`` (or a 1 kB range read of the MRC header) without downloading data.
+The metadata json (``https_metadata_path``) is the ingestion ``metadata`` block verbatim.
 """
 
 import json
 import re
+import struct
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import requests
 from cryoet_alignment.io.cryoet_data_portal import Alignment
@@ -24,7 +32,7 @@ from cryoet_alignment.io.cryoet_data_portal import Alignment
 FILES_HOST = "https://files.cryoetdataportal.cziscience.com/"
 S3_BUCKET = "s3://cryoet-data-portal-public/"
 
-PORTAL_SOURCE_FORMS = "portal:<dataset-id>[/<run-name>][@alignment=ID,voxel=A]"
+PORTAL_SOURCE_FORMS = "portal:<dataset-id>[/<run-name>][@alignment=ID,voxel=A,annotations=all|none|ID+ID]"
 _PORTAL_RE = re.compile(r"^portal:(?P<dataset>\d+)(?:/(?P<run>[^@]+))?(?:@(?P<opts>.*))?$")
 
 
@@ -34,6 +42,13 @@ class PortalSource:
     run_name: Optional[str] = None
     alignment_id: Optional[int] = None
     voxel_spacing: Optional[float] = None
+    annotations: str = "all"  # all | none | comma-free list joined by '+': "69546+69547"
+
+    @property
+    def annotation_ids(self) -> Optional[List[int]]:
+        if self.annotations in ("all", "none"):
+            return None
+        return [int(v) for v in self.annotations.split("+") if v]
 
 
 def parse_portal_source(token: str) -> PortalSource:
@@ -41,6 +56,7 @@ def parse_portal_source(token: str) -> PortalSource:
     if not m:
         raise ValueError(f"{token!r}: portal sources are {PORTAL_SOURCE_FORMS}")
     alignment = voxel = None
+    annotations = "all"
     for part in (m.group("opts") or "").split(","):
         part = part.strip()
         if not part:
@@ -50,10 +66,14 @@ def parse_portal_source(token: str) -> PortalSource:
             alignment = int(val)
         elif key == "voxel" and val:
             voxel = float(val)
+        elif key == "annotations" and val:
+            if val not in ("all", "none") and not re.fullmatch(r"\d+(\+\d+)*", val):
+                raise ValueError(f"{token!r}: annotations= takes all, none or ids joined by '+' (e.g. 69546+69547)")
+            annotations = val
         else:
-            raise ValueError(f"{token!r}: unknown portal option {part!r} (alignment=ID, voxel=A)")
+            raise ValueError(f"{token!r}: unknown portal option {part!r} (alignment=ID, voxel=A, annotations=...)")
     run = m.group("run")
-    return PortalSource(int(m.group("dataset")), run.strip() if run else None, alignment, voxel)
+    return PortalSource(int(m.group("dataset")), run.strip() if run else None, alignment, voxel, annotations)
 
 
 def https_to_s3(url: Optional[str]) -> Optional[str]:
@@ -105,6 +125,41 @@ class PortalAlignment:
 
 
 @dataclass
+class PortalAnnotationFile:
+    id: int
+    shape_type: str  # Point | OrientedPoint | InstanceSegmentation | SegmentationMask | ...
+    format: str  # ndjson | zarr | mrc
+    https_path: str
+    tomogram_voxel_spacing_id: Optional[int]
+    voxel_spacing: Optional[float]
+    alignment_id: Optional[int]
+    is_visualization_default: Optional[bool]
+    source: Optional[str]
+    file_size: Optional[float] = None
+    local_path: Optional[str] = None  # cached ndjson
+    grid: Optional[tuple] = None  # (nx, ny, nz) of a mask, from the zarr / mrc header
+    grid_voxel_a: Optional[float] = None
+
+
+@dataclass
+class PortalAnnotation:
+    id: int
+    object_name: Optional[str]
+    object_id: Optional[str]
+    object_state: Optional[str]
+    annotation_method: Optional[str]
+    method_type: Optional[str]
+    ground_truth_status: Optional[bool]
+    is_curator_recommended: Optional[bool]
+    annotation_software: Optional[str]
+    confidence_precision: Optional[float]
+    confidence_recall: Optional[float]
+    https_metadata_path: Optional[str]
+    metadata: Optional[dict] = None
+    files: List[PortalAnnotationFile] = field(default_factory=list)
+
+
+@dataclass
 class PortalRunData:
     dataset_id: int
     run_id: int
@@ -122,6 +177,8 @@ class PortalRunData:
     sections: List[PortalSection] = field(default_factory=list)
     alignments: List[PortalAlignment] = field(default_factory=list)
     tomograms: List[PortalTomogram] = field(default_factory=list)
+    annotations: List[PortalAnnotation] = field(default_factory=list)
+    tomogram_voxel_spacing_ids: Dict[int, int] = field(default_factory=dict)  # tomogram id -> voxel-spacing id
 
     @property
     def stem(self) -> str:
@@ -155,9 +212,65 @@ def fetch_alignment_metadata(url: str, cache: Optional[Path] = None) -> dict:
     return j
 
 
-def fetch_run(client, run, *, cache_dir: Optional[Path] = None) -> PortalRunData:
+def fetch_json(url: str, cache: Optional[Path] = None) -> dict:
+    if cache is not None and cache.exists():
+        return json.loads(cache.read_text())
+    j = requests.get(url, timeout=120).json()
+    if cache is not None:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(j, indent=1))
+    return j
+
+
+def fetch_text_file(url: str, cache: Path) -> Path:
+    if not cache.exists():
+        r = requests.get(url, timeout=300)
+        r.raise_for_status()
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_bytes(r.content)
+    return cache
+
+
+def probe_mask_grid(https_path: str, fmt: str) -> Tuple[Optional[tuple], Optional[float]]:
+    """``(nx, ny, nz), voxel Å`` of a portal mask without downloading it: OME-Zarr v2 ``.zattrs`` (axes z,y,x in
+    Å, scale of level 0) + ``0/.zarray`` (shape), or the first 1024 bytes of the MRC header."""
+    base = https_path.rstrip("/")
+    try:
+        if fmt == "zarr":
+            attrs = requests.get(f"{base}/.zattrs", timeout=60).json()
+            zarray = requests.get(f"{base}/0/.zarray", timeout=60).json()
+            ms = attrs["multiscales"][0]
+            names = [ax["name"] for ax in ms["axes"]]
+            scale = next(t["scale"] for t in ms["datasets"][0]["coordinateTransformations"] if t["type"] == "scale")
+            shape = zarray["shape"]
+            by_axis = dict(zip(names, shape, strict=True))
+            vox = dict(zip(names, scale, strict=True))
+            grid = (int(by_axis["x"]), int(by_axis["y"]), int(by_axis["z"]))
+            return grid, float(vox["x"])
+        if fmt == "mrc":
+            r = requests.get(base, headers={"Range": "bytes=0-1023"}, timeout=60)
+            h = r.content[:1024]
+            nx, ny, nz = struct.unpack("<3i", h[:12])
+            mx = struct.unpack("<3i", h[28:40])[0]
+            cella = struct.unpack("<3f", h[40:52])
+            return (int(nx), int(ny), int(nz)), (float(cella[0]) / mx if mx else None)
+    except Exception:  # noqa: BLE001 - the caller reports and falls back
+        return None, None
+    return None, None
+
+
+def fetch_run(client, run, *, cache_dir: Optional[Path] = None, annotations: str = "all") -> PortalRunData:
     from cryoet_data_portal import Alignment as ApiAlignment
-    from cryoet_data_portal import Frame, FrameAcquisitionFile, PerSectionParameters, TiltSeries, Tomogram
+    from cryoet_data_portal import Annotation as ApiAnnotation
+    from cryoet_data_portal import (
+        AnnotationFile,
+        AnnotationShape,
+        Frame,
+        FrameAcquisitionFile,
+        PerSectionParameters,
+        TiltSeries,
+        Tomogram,
+    )
 
     ts_list = TiltSeries.find(client, [TiltSeries.run_id == run.id])
     if not ts_list:
@@ -232,6 +345,60 @@ def fetch_run(client, run, *, cache_dir: Optional[Path] = None) -> PortalRunData
         )
         for t in Tomogram.find(client, [Tomogram.run_id == run.id])
     ]
+    tvs_ids = {int(t.id): int(t.tomogram_voxel_spacing_id) for t in Tomogram.find(client, [Tomogram.run_id == run.id])}
+    anns: List[PortalAnnotation] = []
+    if annotations != "none":
+        wanted = None if annotations == "all" else {int(v) for v in annotations.split("+") if v}
+        for a in ApiAnnotation.find(client, [ApiAnnotation.run_id == run.id]):
+            if wanted is not None and int(a.id) not in wanted:
+                continue
+            meta_cache = (cache_dir / run.name / "annotations" / f"{a.id}_metadata.json") if cache_dir else None
+            ann_meta: Optional[dict] = fetch_json(a.https_metadata_path, meta_cache) if a.https_metadata_path else None
+            files: List[PortalAnnotationFile] = []
+            for shape in AnnotationShape.find(client, [AnnotationShape.annotation_id == a.id]):
+                for f in AnnotationFile.find(client, [AnnotationFile.annotation_shape_id == shape.id]):
+                    tvs = f.tomogram_voxel_spacing
+                    pf = PortalAnnotationFile(
+                        id=int(f.id),
+                        shape_type=str(shape.shape_type),
+                        format=str(f.format),
+                        https_path=str(f.https_path),
+                        tomogram_voxel_spacing_id=int(f.tomogram_voxel_spacing_id)
+                        if f.tomogram_voxel_spacing_id
+                        else None,
+                        voxel_spacing=float(tvs.voxel_spacing) if tvs is not None else None,
+                        alignment_id=int(f.alignment_id) if f.alignment_id else None,
+                        is_visualization_default=f.is_visualization_default,
+                        source=getattr(f, "source", None),
+                        file_size=float(f.file_size) if f.file_size else None,
+                    )
+                    if pf.format == "ndjson" and cache_dir is not None:
+                        pf.local_path = str(
+                            fetch_text_file(
+                                pf.https_path, cache_dir / run.name / "annotations" / f"{a.id}_{pf.shape_type}.ndjson"
+                            )
+                        )
+                    elif pf.format in ("zarr", "mrc"):
+                        pf.grid, pf.grid_voxel_a = probe_mask_grid(pf.https_path, pf.format)
+                    files.append(pf)
+            anns.append(
+                PortalAnnotation(
+                    id=int(a.id),
+                    object_name=a.object_name,
+                    object_id=a.object_id,
+                    object_state=a.object_state,
+                    annotation_method=a.annotation_method,
+                    method_type=a.method_type,
+                    ground_truth_status=a.ground_truth_status,
+                    is_curator_recommended=a.is_curator_recommended,
+                    annotation_software=a.annotation_software,
+                    confidence_precision=a.confidence_precision,
+                    confidence_recall=a.confidence_recall,
+                    https_metadata_path=a.https_metadata_path,
+                    metadata=ann_meta,
+                    files=files,
+                )
+            )
     return PortalRunData(
         dataset_id=int(run.dataset_id),
         run_id=int(run.id),
@@ -249,6 +416,8 @@ def fetch_run(client, run, *, cache_dir: Optional[Path] = None) -> PortalRunData
         sections=sections,
         alignments=alignments,
         tomograms=tomos,
+        annotations=anns,
+        tomogram_voxel_spacing_ids=tvs_ids,
     )
 
 
@@ -305,5 +474,21 @@ def run_data_from_json(d: dict) -> PortalRunData:
         a["hub"] = Alignment(**hub) if hub else None
         alignments.append(PortalAlignment(**a))
     tomograms = [PortalTomogram(**{**t, "size": tuple(t["size"])}) for t in d.pop("tomograms")]
+    anns = []
+    for a in d.pop("annotations", []) or []:
+        a = dict(a)
+        files = [
+            PortalAnnotationFile(**{**f, "grid": tuple(f["grid"]) if f.get("grid") else None})
+            for f in a.pop("files", [])
+        ]
+        anns.append(PortalAnnotation(**a, files=files))
+    tvs = {int(k): int(v) for k, v in (d.pop("tomogram_voxel_spacing_ids", {}) or {}).items()}
     d["size"] = tuple(d["size"])
-    return PortalRunData(**d, sections=sections, alignments=alignments, tomograms=tomograms)
+    return PortalRunData(
+        **d,
+        sections=sections,
+        alignments=alignments,
+        tomograms=tomograms,
+        annotations=anns,
+        tomogram_voxel_spacing_ids=tvs,
+    )

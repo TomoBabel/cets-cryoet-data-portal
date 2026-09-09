@@ -1656,5 +1656,831 @@
    "https_mrc_file": "https://files.cryoetdataportal.cziscience.com/10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Tomograms/101/TS_105_5.mrc",
    "https_omezarr_dir": "https://files.cryoetdataportal.cziscience.com/10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Tomograms/101/TS_105_5.zarr"
   }
- ]
+ ],
+ "annotations": [
+  {
+   "id": 69545,
+   "object_name": "membrane",
+   "object_id": "GO:0016020",
+   "object_state": null,
+   "annotation_method": "Prediction using membrain-seg without rescaling and weights MemBrain_seg_v10_alpha.ckpt",
+   "method_type": "automated",
+   "ground_truth_status": false,
+   "is_curator_recommended": true,
+   "annotation_software": "membrain-seg 0.0.1",
+   "confidence_precision": null,
+   "confidence_recall": null,
+   "https_metadata_path": "https://files.cryoetdataportal.cziscience.com/10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/100/membrane-1.0.json",
+   "metadata": {
+    "annotation_ingest_id": "membrane-1",
+    "annotation_method": "Prediction using membrain-seg without rescaling and weights MemBrain_seg_v10_alpha.ckpt",
+    "annotation_object": {
+     "id": "GO:0016020",
+     "name": "membrane"
+    },
+    "annotation_publications": "10.1101/2024.01.05.574336",
+    "annotation_software": "membrain-seg 0.0.1",
+    "authors": [
+     {
+      "ORCID": "0000-0002-5940-3897",
+      "corresponding_author_status": false,
+      "name": "Ariana Peck",
+      "primary_author_status": true
+     },
+     {
+      "ORCID": "0000-0002-3248-9678",
+      "corresponding_author_status": false,
+      "name": "Yue Yu",
+      "primary_author_status": true
+     },
+     {
+      "ORCID": "0000-0002-8063-6951",
+      "corresponding_author_status": false,
+      "name": "Jonathan Schwartz",
+      "primary_author_status": true
+     },
+     {
+      "ORCID": "0000-0003-0466-4376",
+      "corresponding_author_status": false,
+      "name": "Anchi Cheng",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0003-4685-037X",
+      "corresponding_author_status": false,
+      "name": "Utz Heinrich Ermel",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-7324-2559",
+      "corresponding_author_status": false,
+      "name": "Saugat Kandel",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-2662-6373",
+      "corresponding_author_status": false,
+      "name": "Dari Kimanius",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-6731-5854",
+      "corresponding_author_status": false,
+      "name": "Elizabeth Montabana",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0001-9010-7298",
+      "corresponding_author_status": false,
+      "name": "Daniel Serwas",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0009-0002-6674-7601",
+      "corresponding_author_status": false,
+      "name": "Hannah Siems",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-2355-2284",
+      "corresponding_author_status": false,
+      "name": "Zhuowen Zhao",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0001-9517-3075",
+      "corresponding_author_status": false,
+      "name": "Shawn Zheng",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-1796-1479",
+      "corresponding_author_status": false,
+      "name": "Matthias Haury",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0003-3512-695X",
+      "corresponding_author_status": false,
+      "name": "David Agard",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-3287-121X",
+      "corresponding_author_status": false,
+      "name": "Clinton Potter",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-0624-5020",
+      "corresponding_author_status": false,
+      "name": "Bridget Carragher",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-7237-1973",
+      "corresponding_author_status": true,
+      "name": "Kyle I. S. Harrington",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-8402-0134",
+      "corresponding_author_status": true,
+      "name": "Mohammadreza Paraan",
+      "primary_author_status": false
+     }
+    ],
+    "dates": {
+     "deposition_date": "2025-02-25",
+     "last_modified_date": "2025-02-25",
+     "release_date": "2025-02-25"
+    },
+    "ground_truth_status": false,
+    "is_curator_recommended": true,
+    "method_links": [
+     {
+      "custom_name": "membrain-seg on GitHub",
+      "link": "https://github.com/teamtomo/membrain-seg",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "membrain-seg on PyPI",
+      "link": "https://pypi.org/project/membrain-seg/",
+      "link_type": "other"
+     }
+    ],
+    "method_type": "automated",
+    "version": 1.0,
+    "object_count": 0,
+    "files": [
+     {
+      "format": "zarr",
+      "path": "10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/100/membrane-1.0_segmentationmask.zarr",
+      "shape": "SegmentationMask",
+      "is_visualization_default": true
+     },
+     {
+      "format": "mrc",
+      "path": "10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/100/membrane-1.0_segmentationmask.mrc",
+      "shape": "SegmentationMask",
+      "is_visualization_default": true
+     }
+    ],
+    "alignment_metadata_path": "10445/TS_105_5/Alignments/100/alignment_metadata.json",
+    "deposition_id": 10310,
+    "last_updated_at": 1772502716
+   },
+   "files": [
+    {
+     "id": 148662,
+     "shape_type": "SegmentationMask",
+     "format": "zarr",
+     "https_path": "https://files.cryoetdataportal.cziscience.com/10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/100/membrane-1.0_segmentationmask.zarr",
+     "tomogram_voxel_spacing_id": 17910,
+     "voxel_spacing": 4.99,
+     "alignment_id": 18924,
+     "is_visualization_default": true,
+     "source": "dataset_author",
+     "file_size": 8118083.0,
+     "local_path": null,
+     "grid": [
+      1260,
+      1260,
+      368
+     ],
+     "grid_voxel_a": 4.99
+    },
+    {
+     "id": 148663,
+     "shape_type": "SegmentationMask",
+     "format": "mrc",
+     "https_path": "https://files.cryoetdataportal.cziscience.com/10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/100/membrane-1.0_segmentationmask.mrc",
+     "tomogram_voxel_spacing_id": 17910,
+     "voxel_spacing": 4.99,
+     "alignment_id": 18924,
+     "is_visualization_default": true,
+     "source": "dataset_author",
+     "file_size": 584237824.0,
+     "local_path": null,
+     "grid": [
+      1260,
+      1260,
+      368
+     ],
+     "grid_voxel_a": 4.9899999224950395
+    }
+   ]
+  },
+  {
+   "id": 69546,
+   "object_name": "ferritin complex",
+   "object_id": "GO:0070288",
+   "object_state": "apo",
+   "annotation_method": "hybrid curation using CellCanvas, copick, slabpick, deepfindET, topaz, minislab curation and cryoSPARC",
+   "method_type": "hybrid",
+   "ground_truth_status": true,
+   "is_curator_recommended": true,
+   "annotation_software": "CellCanvas + ChimeraX-copick 0.5.0 + copick-live + pytom-match-pick 0.6.0 + slabpick 0.1.0 + deepfindET 0.4.0 + topaz 0.2.5 + cryoSPARC 4.4.1",
+   "confidence_precision": null,
+   "confidence_recall": null,
+   "https_metadata_path": "https://files.cryoetdataportal.cziscience.com/10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/101/ferritin_complex-1.0.json",
+   "metadata": {
+    "annotation_ingest_id": "ferritin-complex-1",
+    "annotation_method": "hybrid curation using CellCanvas, copick, slabpick, deepfindET, topaz, minislab curation and cryoSPARC",
+    "annotation_object": {
+     "id": "GO:0070288",
+     "name": "ferritin complex",
+     "state": "apo"
+    },
+    "annotation_publications": "10.1101/2024.11.04.621686, 10.1101/2024.11.04.621608, EMD-41923",
+    "annotation_software": "CellCanvas + ChimeraX-copick 0.5.0 + copick-live + pytom-match-pick 0.6.0 + slabpick 0.1.0 + deepfindET 0.4.0 + topaz 0.2.5 + cryoSPARC 4.4.1",
+    "authors": [
+     {
+      "ORCID": "0000-0002-5940-3897",
+      "corresponding_author_status": false,
+      "name": "Ariana Peck",
+      "primary_author_status": true
+     },
+     {
+      "ORCID": "0000-0002-3248-9678",
+      "corresponding_author_status": false,
+      "name": "Yue Yu",
+      "primary_author_status": true
+     },
+     {
+      "ORCID": "0000-0002-8063-6951",
+      "corresponding_author_status": false,
+      "name": "Jonathan Schwartz",
+      "primary_author_status": true
+     },
+     {
+      "ORCID": "0000-0003-0466-4376",
+      "corresponding_author_status": false,
+      "name": "Anchi Cheng",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0003-4685-037X",
+      "corresponding_author_status": false,
+      "name": "Utz Heinrich Ermel",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-7324-2559",
+      "corresponding_author_status": false,
+      "name": "Saugat Kandel",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-2662-6373",
+      "corresponding_author_status": false,
+      "name": "Dari Kimanius",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-6731-5854",
+      "corresponding_author_status": false,
+      "name": "Elizabeth Montabana",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0001-9010-7298",
+      "corresponding_author_status": false,
+      "name": "Daniel Serwas",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0009-0002-6674-7601",
+      "corresponding_author_status": false,
+      "name": "Hannah Siems",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-2355-2284",
+      "corresponding_author_status": false,
+      "name": "Zhuowen Zhao",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0001-9517-3075",
+      "corresponding_author_status": false,
+      "name": "Shawn Zheng",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-1796-1479",
+      "corresponding_author_status": false,
+      "name": "Matthias Haury",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0003-3512-695X",
+      "corresponding_author_status": false,
+      "name": "David Agard",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-3287-121X",
+      "corresponding_author_status": false,
+      "name": "Clinton Potter",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-0624-5020",
+      "corresponding_author_status": false,
+      "name": "Bridget Carragher",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-7237-1973",
+      "corresponding_author_status": true,
+      "name": "Kyle I. S. Harrington",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-8402-0134",
+      "corresponding_author_status": true,
+      "name": "Mohammadreza Paraan",
+      "primary_author_status": false
+     }
+    ],
+    "dates": {
+     "deposition_date": "2025-02-25",
+     "last_modified_date": "2025-02-25",
+     "release_date": "2025-02-25"
+    },
+    "ground_truth_status": true,
+    "is_curator_recommended": true,
+    "method_links": [
+     {
+      "custom_name": "slabpick on GitHub",
+      "link": "https://github.com/apeck12/slabpick",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "CellCanvas homepage",
+      "link": "https://cellcanvas.org/",
+      "link_type": "website"
+     },
+     {
+      "custom_name": "deepfindET on GitHub",
+      "link": "https://github.com/copick/DeepFindET",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "copick on GitHub",
+      "link": "https://github.com/copick/copick",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "copick-live on GitHub",
+      "link": "https://github.com/copick/copick_live",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "chimerax-copick on GitHub",
+      "link": "https://github.com/copick/chimerax-copick",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "pytom-match-pick on GitHub",
+      "link": "https://github.com/SBC-Utrecht/pytom-match-pick",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "topaz on GitHub",
+      "link": "https://github.com/tbepler/topaz",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "cryosparc homepage",
+      "link": "https://cryosparc.com/",
+      "link_type": "website"
+     }
+    ],
+    "method_type": "hybrid",
+    "version": 1.0,
+    "object_count": 43,
+    "files": [
+     {
+      "format": "ndjson",
+      "path": "10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/101/ferritin_complex-1.0_point.ndjson",
+      "shape": "Point",
+      "is_visualization_default": true
+     }
+    ],
+    "alignment_metadata_path": "10445/TS_105_5/Alignments/100/alignment_metadata.json",
+    "deposition_id": 10310,
+    "last_updated_at": 1772502717
+   },
+   "files": [
+    {
+     "id": 148664,
+     "shape_type": "Point",
+     "format": "ndjson",
+     "https_path": "https://files.cryoetdataportal.cziscience.com/10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/101/ferritin_complex-1.0_point.ndjson",
+     "tomogram_voxel_spacing_id": 17910,
+     "voxel_spacing": 4.99,
+     "alignment_id": 18924,
+     "is_visualization_default": true,
+     "source": "dataset_author",
+     "file_size": 4512.0,
+     "local_path": "annotations/69546_Point.ndjson",
+     "grid": null,
+     "grid_voxel_a": null
+    }
+   ]
+  },
+  {
+   "id": 69547,
+   "object_name": "Beta-amylase",
+   "object_id": "UniProtKB:P10537",
+   "object_state": "tetrameric",
+   "annotation_method": "hybrid curation using CellCanvas, copick, slabpick, deepfindET, topaz, minislab curation and cryoSPARC",
+   "method_type": "hybrid",
+   "ground_truth_status": true,
+   "is_curator_recommended": true,
+   "annotation_software": "CellCanvas + ChimeraX-copick 0.5.0 + copick-live + pytom-match-pick 0.6.0 + slabpick 0.1.0 + deepfindET 0.4.0 + topaz 0.2.5 + cryoSPARC 4.4.1",
+   "confidence_precision": null,
+   "confidence_recall": null,
+   "https_metadata_path": "https://files.cryoetdataportal.cziscience.com/10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/102/beta_amylase-1.0.json",
+   "metadata": {
+    "annotation_ingest_id": "beta-amylase-1",
+    "annotation_method": "hybrid curation using CellCanvas, copick, slabpick, deepfindET, topaz, minislab curation and cryoSPARC",
+    "annotation_object": {
+     "id": "UniProtKB:P10537",
+     "name": "Beta-amylase",
+     "state": "tetrameric"
+    },
+    "annotation_publications": "10.1101/2024.11.04.621686, 10.1101/2024.11.04.621608, EMD-30405",
+    "annotation_software": "CellCanvas + ChimeraX-copick 0.5.0 + copick-live + pytom-match-pick 0.6.0 + slabpick 0.1.0 + deepfindET 0.4.0 + topaz 0.2.5 + cryoSPARC 4.4.1",
+    "authors": [
+     {
+      "ORCID": "0000-0002-5940-3897",
+      "corresponding_author_status": false,
+      "name": "Ariana Peck",
+      "primary_author_status": true
+     },
+     {
+      "ORCID": "0000-0002-3248-9678",
+      "corresponding_author_status": false,
+      "name": "Yue Yu",
+      "primary_author_status": true
+     },
+     {
+      "ORCID": "0000-0002-8063-6951",
+      "corresponding_author_status": false,
+      "name": "Jonathan Schwartz",
+      "primary_author_status": true
+     },
+     {
+      "ORCID": "0000-0003-0466-4376",
+      "corresponding_author_status": false,
+      "name": "Anchi Cheng",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0003-4685-037X",
+      "corresponding_author_status": false,
+      "name": "Utz Heinrich Ermel",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-7324-2559",
+      "corresponding_author_status": false,
+      "name": "Saugat Kandel",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-2662-6373",
+      "corresponding_author_status": false,
+      "name": "Dari Kimanius",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-6731-5854",
+      "corresponding_author_status": false,
+      "name": "Elizabeth Montabana",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0001-9010-7298",
+      "corresponding_author_status": false,
+      "name": "Daniel Serwas",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0009-0002-6674-7601",
+      "corresponding_author_status": false,
+      "name": "Hannah Siems",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-2355-2284",
+      "corresponding_author_status": false,
+      "name": "Zhuowen Zhao",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0001-9517-3075",
+      "corresponding_author_status": false,
+      "name": "Shawn Zheng",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-1796-1479",
+      "corresponding_author_status": false,
+      "name": "Matthias Haury",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0003-3512-695X",
+      "corresponding_author_status": false,
+      "name": "David Agard",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-3287-121X",
+      "corresponding_author_status": false,
+      "name": "Clinton Potter",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-0624-5020",
+      "corresponding_author_status": false,
+      "name": "Bridget Carragher",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-7237-1973",
+      "corresponding_author_status": true,
+      "name": "Kyle I. S. Harrington",
+      "primary_author_status": false
+     },
+     {
+      "ORCID": "0000-0002-8402-0134",
+      "corresponding_author_status": true,
+      "name": "Mohammadreza Paraan",
+      "primary_author_status": false
+     }
+    ],
+    "dates": {
+     "deposition_date": "2025-02-25",
+     "last_modified_date": "2025-02-25",
+     "release_date": "2025-02-25"
+    },
+    "ground_truth_status": true,
+    "is_curator_recommended": true,
+    "method_links": [
+     {
+      "custom_name": "slabpick on GitHub",
+      "link": "https://github.com/apeck12/slabpick",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "CellCanvas homepage",
+      "link": "https://cellcanvas.org/",
+      "link_type": "website"
+     },
+     {
+      "custom_name": "deepfindET on GitHub",
+      "link": "https://github.com/copick/DeepFindET",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "copick on GitHub",
+      "link": "https://github.com/copick/copick",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "copick-live on GitHub",
+      "link": "https://github.com/copick/copick_live",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "chimerax-copick on GitHub",
+      "link": "https://github.com/copick/chimerax-copick",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "pytom-match-pick on GitHub",
+      "link": "https://github.com/SBC-Utrecht/pytom-match-pick",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "topaz on GitHub",
+      "link": "https://github.com/tbepler/topaz",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "cryosparc homepage",
+      "link": "https://cryosparc.com/",
+      "link_type": "website"
+     }
+    ],
+    "method_type": "hybrid",
+    "version": 1.0,
+    "object_count": 2,
+    "files": [
+     {
+      "format": "ndjson",
+      "path": "10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/102/beta_amylase-1.0_point.ndjson",
+      "shape": "Point",
+      "is_visualization_default": true
+     }
+    ],
+    "alignment_metadata_path": "10445/TS_105_5/Alignments/100/alignment_metadata.json",
+    "deposition_id": 10310,
+    "last_updated_at": 1772502718
+   },
+   "files": [
+    {
+     "id": 148665,
+     "shape_type": "Point",
+     "format": "ndjson",
+     "https_path": "https://files.cryoetdataportal.cziscience.com/10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/102/beta_amylase-1.0_point.ndjson",
+     "tomogram_voxel_spacing_id": 17910,
+     "voxel_spacing": 4.99,
+     "alignment_id": 18924,
+     "is_visualization_default": true,
+     "source": "dataset_author",
+     "file_size": 207.0,
+     "local_path": "annotations/69547_Point.ndjson",
+     "grid": null,
+     "grid_voxel_a": null
+    }
+   ]
+  },
+  {
+   "id": 175505,
+   "object_name": "ferritin complex",
+   "object_id": "GO:0070288",
+   "object_state": "apo",
+   "annotation_method": "Automated particle detection with Octopi, a self-configuring supervised 3D U-Net (built on MONAI primitives) whose architecture and training hyperparameters are selected per dataset via Bayesian optimization (Optuna, TPE sampler). Particle coordinates were extracted from the predicted per-class segmentation masks using a watershed-based peak detector, retaining candidates whose effective radius is 50-100% of the specified particle radius. Coordinates were validated by subtomogram averaging with py2rely (RELION-5).",
+   "method_type": "automated",
+   "ground_truth_status": false,
+   "is_curator_recommended": true,
+   "annotation_software": "Octopi",
+   "confidence_precision": null,
+   "confidence_recall": null,
+   "https_metadata_path": "https://files.cryoetdataportal.cziscience.com/10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/158/ferritin_complex-1.0.json",
+   "metadata": {
+    "annotation_ingest_id": "apo-ferritin-octopi-1",
+    "annotation_method": "Automated particle detection with Octopi, a self-configuring supervised 3D U-Net (built on MONAI primitives) whose architecture and training hyperparameters are selected per dataset via Bayesian optimization (Optuna, TPE sampler). Particle coordinates were extracted from the predicted per-class segmentation masks using a watershed-based peak detector, retaining candidates whose effective radius is 50-100% of the specified particle radius. Coordinates were validated by subtomogram averaging with py2rely (RELION-5).",
+    "annotation_object": {
+     "id": "GO:0070288",
+     "name": "ferritin complex",
+     "state": "apo"
+    },
+    "annotation_publications": "EMD-41923",
+    "annotation_software": "Octopi",
+    "authors": [
+     {
+      "name": "Jonathan Schwartz",
+      "ORCID": "0000-0002-8063-6951",
+      "primary_author_status": true,
+      "corresponding_author_status": false
+     },
+     {
+      "name": "Rahel Woldeyes",
+      "ORCID": "0000-0003-0737-8383",
+      "primary_author_status": false,
+      "corresponding_author_status": false
+     },
+     {
+      "name": "Zhuowen Zhao",
+      "ORCID": "0000-0002-2355-2284",
+      "primary_author_status": false,
+      "corresponding_author_status": false
+     },
+     {
+      "name": "Joshua Hutchings",
+      "ORCID": "0000-0001-6841-8583",
+      "primary_author_status": false,
+      "corresponding_author_status": false
+     },
+     {
+      "name": "Daniel Ji",
+      "ORCID": "0009-0003-2008-9583",
+      "primary_author_status": false,
+      "corresponding_author_status": false
+     },
+     {
+      "name": "Utz Heinrich Ermel",
+      "ORCID": "0000-0003-4685-037X",
+      "primary_author_status": false,
+      "corresponding_author_status": false
+     },
+     {
+      "name": "Christof Henkel",
+      "ORCID": "0000-0002-2913-3662",
+      "primary_author_status": false,
+      "corresponding_author_status": false
+     },
+     {
+      "name": "Mallak Ali",
+      "ORCID": "0009-0007-8169-0996",
+      "primary_author_status": false,
+      "corresponding_author_status": false
+     },
+     {
+      "name": "David Agard",
+      "ORCID": "0000-0003-3512-695X",
+      "primary_author_status": false,
+      "corresponding_author_status": false
+     },
+     {
+      "name": "Mohammadreza Paraan",
+      "ORCID": "0000-0002-8402-0134",
+      "primary_author_status": false,
+      "corresponding_author_status": false
+     },
+     {
+      "name": "Bridget Carragher",
+      "ORCID": "0000-0002-0624-5020",
+      "primary_author_status": false,
+      "corresponding_author_status": false
+     },
+     {
+      "name": "Dari Kimanius",
+      "ORCID": "0000-0002-2662-6373",
+      "primary_author_status": false,
+      "corresponding_author_status": true,
+      "email": "dari.kimanius@biohub.org"
+     }
+    ],
+    "dates": {
+     "deposition_date": "2026-06-24",
+     "last_modified_date": "2026-06-24",
+     "release_date": "2026-06-24"
+    },
+    "ground_truth_status": false,
+    "is_curator_recommended": true,
+    "method_links": [
+     {
+      "custom_name": "Octopi on GitHub",
+      "link": "https://github.com/chanzuckerberg/octopi",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "RELION on GitHub",
+      "link": "https://github.com/3dem/relion",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "py2rely on GitHub",
+      "link": "https://github.com/chanzuckerberg/py2rely",
+      "link_type": "source_code"
+     },
+     {
+      "custom_name": "py2rely documentation",
+      "link": "https://chanzuckerberg.github.io/py2rely/",
+      "link_type": "documentation"
+     },
+     {
+      "custom_name": "copick on GitHub",
+      "link": "https://github.com/copick/copick",
+      "link_type": "source_code"
+     }
+    ],
+    "method_type": "automated",
+    "version": 1.0,
+    "object_count": 95,
+    "files": [
+     {
+      "format": "ndjson",
+      "path": "10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/158/ferritin_complex-1.0_orientedpoint.ndjson",
+      "shape": "OrientedPoint",
+      "is_visualization_default": false
+     }
+    ],
+    "alignment_metadata_path": "10445/TS_105_5/Alignments/100/alignment_metadata.json",
+    "deposition_id": 10358,
+    "last_updated_at": 1783607138
+   },
+   "files": [
+    {
+     "id": 363433,
+     "shape_type": "OrientedPoint",
+     "format": "ndjson",
+     "https_path": "https://files.cryoetdataportal.cziscience.com/10445/TS_105_5/Reconstructions/VoxelSpacing4.990/Annotations/158/ferritin_complex-1.0_orientedpoint.ndjson",
+     "tomogram_voxel_spacing_id": 17910,
+     "voxel_spacing": 4.99,
+     "alignment_id": 18924,
+     "is_visualization_default": false,
+     "source": "community",
+     "file_size": 31372.0,
+     "local_path": "annotations/175505_OrientedPoint.ndjson",
+     "grid": null,
+     "grid_voxel_a": null
+    }
+   ]
+  }
+ ],
+ "tomogram_voxel_spacing_ids": {
+  "18954": 17909,
+  "18955": 17909,
+  "18956": 17910,
+  "18957": 17910
+ }
 }
