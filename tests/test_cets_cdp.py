@@ -86,7 +86,7 @@ def test_recorded_run_to_cets(data, tmp_path):
     assert any(g.name == "portal_volume_box_vs_reference_tomogram" and g.passed for g in sr.gates)
 
 
-def test_g5_roundtrip_to_aln_equals_portal_aln(data, tmp_path):
+def test_roundtrip_to_aln_equals_portal_aln(data, tmp_path):
     out = tmp_path / "10445.cets.json"
     _to_cets(data, out)
     r = _run(["from-cets", str(out), "-o", str(tmp_path / "stage"), "--deposition-id", "1", "--no-validate"])
